@@ -1,67 +1,99 @@
-import React from 'react';
-import { View, Image, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { useRouter } from 'expo-router';
+import React from "react";
+import {
+  View,
+  Image,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  SafeAreaView,
+} from "react-native";
+import { useRouter } from "expo-router";
 
 const ScooterDashboard: React.FC = () => {
   const router = useRouter();
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header with title and profile */}
       <View style={styles.headerContainer}>
-        <View>
-          <Text style={styles.header}>My Scooter</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>My Scooter</Text>
           <View style={styles.statusContainer}>
             <View style={styles.statusDot} />
-            <Text style={styles.status}>Available</Text>
+            <Text style={styles.statusText}>Available</Text>
           </View>
         </View>
-        <Image 
-          source={require('../assets/images/home/dude.png')} 
-          style={styles.avatar} 
+        <Image
+          source={{
+            uri: "https://api.builder.io/api/v1/image/assets/TEMP/91972ddee7f73ce465849bf6f128876ac2787206?width=114",
+          }}
+          style={styles.profileImage}
         />
       </View>
-      <Image 
-        source={require('../assets/images/home/scooter2.png')} 
-        style={styles.scooterImage} 
-      />
-      <View style={styles.slideBackground}>
-        <View style={styles.slideForeground}>
-          <Text style={styles.slideText}>Slide to Lock</Text>
-        </View>
-        <View style={styles.slideCircle}>
-          <Image 
-            source={require('../assets/images/home/power.png')} 
-            style={styles.slideIcon} 
+
+      {/* Main scooter image */}
+      <View style={styles.scooterContainer}>
+        <Image
+          source={{
+            uri: "https://api.builder.io/api/v1/image/assets/TEMP/25ce964af8c388a37bd0c5a094f3715eb65f905f?width=924",
+          }}
+          style={styles.scooterImage}
+        />
+      </View>
+
+      {/* Current location */}
+      <View style={styles.locationContainer}>
+        <View style={styles.locationDot} />
+        <Text style={styles.locationText}>
+          Current Location: USC Campus
+        </Text>
+      </View>
+
+      {/* Lock button */}
+      <TouchableOpacity style={styles.lockButton} activeOpacity={0.8}>
+        <View style={styles.lockIconContainer}>
+          <Image
+            source={{
+              uri: "https://api.builder.io/api/v1/image/assets/TEMP/098eec73d27d5c64cb08e16a60ca3998a3635614?width=56",
+            }}
+            style={styles.lockIcon}
           />
         </View>
-      </View>
-      <View style={styles.bottomContainer}>
-        <View style={styles.bottomLeftCard}>
-          <View style={styles.bottomLeftIcon}>
-            <Image 
-              source={require('../assets/images/home/lock.png')} 
-              style={styles.bottomLeftImage} 
-            />
+        <Text style={styles.lockText}>Lock</Text>
+      </TouchableOpacity>
 
+      {/* Bottom cards */}
+      <View style={styles.cardsContainer}>
+        <View style={styles.securityCard}>
+          <View style={styles.cardIconContainer}>
+            <Image
+              source={{
+                uri: "https://api.builder.io/api/v1/image/assets/TEMP/752e97db974e549ecd825077f8fece72c632b4d1?width=50",
+              }}
+              style={styles.cardIcon}
+            />
           </View>
-          <View>
-            <Text style={styles.bottomLeftTitle}>Security System</Text>
-            <Text style={styles.bottomLeftSubtitle}>Alarm & Sensor</Text>
+          <View style={styles.cardTextContainer}>
+            <Text style={styles.cardTitle}>Security System</Text>
+            <Text style={styles.cardSubtitle}>Alarm & Sensor</Text>
           </View>
         </View>
-        <TouchableOpacity 
-          style={styles.bottomRightCard} 
-          onPress={() => router.push('/map')} 
+
+        <TouchableOpacity
+          style={styles.analyzerCard}
+          onPress={() => router.push("/map")}
           activeOpacity={0.8}
         >
-          <View style={styles.bottomRightIcon}>
-            <Image 
-              source={require('../assets/images/home/robot.png')} 
-              style={styles.bottomRightImage} 
+          <View style={styles.cardIconContainer}>
+            <Image
+              source={{
+                uri: "https://api.builder.io/api/v1/image/assets/TEMP/9a936899395fe6460434678f8415bb5f7cd426b0?width=50",
+              }}
+              style={styles.cardIcon}
             />
           </View>
-          <View>
-            <Text style={styles.bottomRightTitle}>Ai Analyzer</Text>
-            <Text style={styles.bottomRightSubtitle}>Reports & Location</Text>
+          <View style={styles.cardTextContainer}>
+            <Text style={styles.cardTitle}>Ai Analyzer</Text>
+            <Text style={styles.cardSubtitle}>Reports & Location</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -72,155 +104,204 @@ const ScooterDashboard: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#101827',
-    paddingHorizontal: 24,
-    paddingBottom: 32,
+    backgroundColor: "#101827",
+    paddingHorizontal: 16,
     paddingTop: 16,
   },
   headerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 32,
+    paddingHorizontal: 8,
   },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+  titleContainer: {
+    alignItems: "flex-start",
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    fontFamily: "Inter",
+    lineHeight: 21,
+    letterSpacing: -0.32,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 4,
   },
   statusDot: {
-    width: 10,
-    height: 10,
-    backgroundColor: '#22C55D',
-    borderRadius: 5,
+    width: 11,
+    height: 11,
+    backgroundColor: "#22C55D",
+    borderRadius: 5.5,
     marginRight: 8,
   },
-  status: {
-    fontSize: 16,
-    color: '#22C55D',
+  statusText: {
+    fontSize: 18,
+    fontWeight: "400",
+    color: "#22C55D",
+    fontFamily: "Inter",
+    lineHeight: 21,
+    letterSpacing: -0.32,
+    textShadowColor: "rgba(0, 0, 0, 0.25)",
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 4,
   },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  profileImage: {
+    width: 57,
+    height: 57,
+    borderRadius: 28.5,
+    shadowColor: "rgba(0, 0, 0, 0.25)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  scooterContainer: {
+    alignItems: "center",
+    marginBottom: 40,
+    paddingHorizontal: 20,
   },
   scooterImage: {
-    height: 250, // Adjusted to a fixed height to prevent pushing content off-screen
-    width: '100%',
-    resizeMode: 'contain',
-    marginBottom: 20, // Add some margin below the scooter image
+    width: 350,
+    height: 350,
+    resizeMode: "contain",
   },
-  slideBackground: {
-    backgroundColor: '#1F2937',
-    borderRadius: 999,
-    height: 72,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    marginBottom: 20, // Adjusted margin to create space between slide and cards
+  locationContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
   },
-  slideForeground: {
-    backgroundColor: '#2563EB',
-    borderRadius: 999,
-    height: 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+  locationDot: {
+    width: 11,
+    height: 11,
+    backgroundColor: "#22C55D",
+    borderRadius: 5.5,
+    marginRight: 8,
   },
-  slideText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-    flex: 1,
-    marginLeft: 48, // Space for the icon
+  locationText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    fontFamily: "Inter",
+    lineHeight: 21,
+    letterSpacing: 0.5,
   },
-  slideCircle: {
-    width: 56,
-    height: 56,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    left: 8,
+  lockButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#48586B",
+    borderRadius: 50,
+    borderWidth: 1,
+    borderColor: "#48586B",
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginHorizontal: 20,
+    marginBottom: 32,
+    shadowColor: "rgba(0, 0, 0, 0.25)",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 0,
+    elevation: 2,
   },
-  slideIcon: {
+  lockIconContainer: {
     width: 28,
     height: 28,
-    tintColor: '#1F2937',
+    borderRadius: 14,
+    backgroundColor: "#374151",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
   },
-  bottomContainer: {
-    flexDirection: 'row',
+  lockIcon: {
+    width: 28,
+    height: 28,
+    shadowColor: "rgba(0, 0, 0, 0.25)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  lockText: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    fontFamily: "Inter",
+    lineHeight: 21,
+  },
+  cardsContainer: {
+    flexDirection: "row",
     gap: 16,
-    marginTop: 'auto', // Pushes the container to the bottom
+    paddingHorizontal: 4,
+    marginBottom: 32,
   },
-  bottomLeftCard: {
+  securityCard: {
     flex: 1,
-    backgroundColor: '#1F2937',
-    borderRadius: 24,
+    backgroundColor: "#1F2937",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#1F2937",
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+    shadowColor: "rgba(0, 0, 0, 0.25)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+    alignItems: "center",
   },
-  bottomLeftIcon: {
-    width: 48,
-    height: 48,
-    backgroundColor: 'rgba(55, 65, 81, 0.5)',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  bottomLeftImage: {
-    width: 24,
-    height: 24,
-    tintColor: '#9CA3AF',
-  },
-  bottomLeftTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  bottomLeftSubtitle: {
-    color: '#9CA3AF',
-    fontSize: 14,
-    marginTop: 2,
-  },
-  bottomRightCard: {
+  analyzerCard: {
     flex: 1,
-    backgroundColor: '#1F2937',
-    borderRadius: 24,
+    backgroundColor: "#1F2937",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#1F2937",
     padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
+    shadowColor: "rgba(0, 0, 0, 0.25)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+    alignItems: "center",
   },
-  bottomRightIcon: {
-    width: 48,
-    height: 48,
-    backgroundColor: 'rgba(55, 65, 81, 0.5)',
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
+  cardIconContainer: {
+    width: 30,
+    height: 32,
+    backgroundColor: "#374151",
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "#1F2937",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
   },
-  bottomRightImage: {
-    width: 24,
-    height: 24,
-    tintColor: '#9CA3AF',
+  cardIcon: {
+    width: 25,
+    height: 25,
   },
-  bottomRightTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  cardTextContainer: {
+    alignItems: "center",
   },
-  bottomRightSubtitle: {
-    color: '#9CA3AF',
-    fontSize: 14,
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    fontFamily: "Inter",
+    lineHeight: 21,
+    letterSpacing: -0.32,
+    textAlign: "center",
+  },
+  cardSubtitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#7B8390",
+    fontFamily: "Inter",
+    lineHeight: 21,
+    letterSpacing: -0.32,
+    textAlign: "center",
     marginTop: 2,
   },
 });

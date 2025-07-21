@@ -23,29 +23,14 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert('Error', 'Username and password are required');
-      return;
-    }
+  const handleLogin = () => {
     setLoading(true);
-    try {
-      const res = await fetch('http://localhost:3001/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (res.ok && data.userId) {
-        Alert.alert('Success', 'Login successful!');
-        router.replace('/home');
-      } else {
-        Alert.alert('Error', data.error || 'Login failed or not registered');
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Network error');
-    }
-    setLoading(false);
+    
+    // Bypass authentication and directly navigate to home
+    setTimeout(() => {
+      setLoading(false);
+      router.replace('/home');
+    }, 500);
   };
 
   const handleRegisterPress = () => {

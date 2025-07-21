@@ -29,24 +29,13 @@ const LoginScreen: React.FC = () => {
       return;
     }
     setLoading(true);
-    try {
-      const res = await fetch('http://localhost:3001/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      const data = await res.json();
-      if (res.ok && data.userId) {
-        Alert.alert('Success', 'Login successful!');
-        // Optionally store userId for later use
-        router.replace('/home'); // Navigate to home page
-      } else {
-        Alert.alert('Error', data.error || 'Login failed or not registered');
-      }
-    } catch (err) {
-      Alert.alert('Error', 'Network error');
-    }
-    setLoading(false);
+    
+    // Temporary bypass of MongoDB authentication
+    setTimeout(() => {
+      setLoading(false);
+      Alert.alert('Success', 'Login successful!');
+      router.replace('/home');
+    }, 1000);
   };
 
   return (

@@ -1,7 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Image, Text, StyleSheet, Pressable, TextInput, ScrollView, Animated, Alert, Platform } from 'react-native';
+import { View, Image, Text, StyleSheet, Pressable, TextInput, ScrollView, Animated, Alert, Platform, TouchableOpacity, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import MapView, { Marker } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
+import { Ionicons } from '@expo/vector-icons';
+
+const { width, height } = Dimensions.get('window');
 
 // Conditional import to prevent native module errors on web
 let Location: any = null;
@@ -28,6 +32,31 @@ interface SafetyZone {
   type: 'security' | 'parking';
   description: string;
 }
+
+interface SafeAlternative {
+  latitude: number;
+  longitude: number;
+  theftCount: number;
+  distanceFromDestination: number;
+  safetyScore: number;
+  name: string;
+}
+
+interface RouteAnalysis {
+  safetyLevel: string;
+  nearbyThefts: number;
+  analysis: string;
+  safeAlternatives: SafeAlternative[];
+  theftReports: TheftReport[];
+}
+
+interface Destination {
+  latitude: number;
+  longitude: number;
+  name: string;
+}
+
+const GOOGLE_MAPS_APIKEY = 'YOUR_GOOGLE_MAPS_API_KEY'; // Replace with your API key
 
 // USC coordinates
 const USC_COORDINATES = {
@@ -60,16 +89,6 @@ const SAFETY_ZONES: SafetyZone[] = [
 // Sample reports near USC
 const SAMPLE_REPORTS: TheftReport[] = [
   {
-    _id: '1',
-    raw: 'Black electric scooter stolen from bike rack near Taper Hall. Victim reported the theft occurred between 2:00 PM and 4:00 PM. Security footage being reviewed.',
-    location: 'Taper Hall, USC',
-    latitude: 34.0218,
-    longitude: -118.2848,
-    title: 'Stolen E-scooter Reported, Lime scooter taken from campus',
-    description: 'Black scooter taken from bike rack',
-    date: new Date().toISOString(),
-  },
-  {
     _id: '2',
     raw: 'Attempted theft of red electric scooter near USC Village. Suspect fled when approached by security. No injuries reported.',
     location: 'USC Village',
@@ -91,6 +110,13 @@ const MapScreen: React.FC = () => {
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [initialRegion, setInitialRegion] = useState(USC_COORDINATES);
+  const [destination, setDestination] = useState<Destination | null>(null);
+  const [destinationInput, setDestinationInput] = useState('');
+  const [showDirections, setShowDirections] = useState(false);
+  const [routeAnalysis, setRouteAnalysis] = useState<RouteAnalysis | null>(null);
+  const [safeAlternatives, setSafeAlternatives] = useState<SafeAlternative[]>([]);
+  const [showRouteAnalysis, setShowRouteAnalysis] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const slideAnim = useState(new Animated.Value(300))[0];
 
   useEffect(() => {
@@ -99,6 +125,7 @@ const MapScreen: React.FC = () => {
       // Skip location services on web to avoid ExpoLocation native module error
       if (Platform.OS === 'web' || !Location) {
         console.log('Location services not available on web, using default USC coordinates');
+        setUserLocation(USC_COORDINATES);
         return;
       }
 
@@ -106,6 +133,7 @@ const MapScreen: React.FC = () => {
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           Alert.alert('Permission denied', 'Location permission is required to show your position on the map.');
+          setUserLocation(USC_COORDINATES);
           return;
         }
 
@@ -116,19 +144,11 @@ const MapScreen: React.FC = () => {
         };
         
         setUserLocation(currentLocation);
-        
-        // Update initial region to user's location
-        setInitialRegion({
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
-
         console.log('User location:', currentLocation);
       } catch (error) {
         console.log('Error getting location:', error);
         Alert.alert('Location Error', 'Could not get your current location. Using USC as default.');
+        setUserLocation(USC_COORDINATES);
       }
     };
 
@@ -147,31 +167,21 @@ const MapScreen: React.FC = () => {
           console.log(`Loaded ${dangerZones.length} danger zones from backend`);
         } else {
           console.log('No reports from backend, using sample data');
+          setReports(SAMPLE_REPORTS);
         }
-      } catch (err) {
-        console.log('Error fetching from backend, using sample data:', err);
-        // Keep sample data as fallback
+      } catch (error) {
+        console.error('Error fetching reports:', error);
+        setReports(SAMPLE_REPORTS);
       }
     };
 
     fetchReports();
-    
-    // Debug: Log the reports to ensure they have valid coordinates
-    console.log('Reports loaded:', reports);
-    reports.forEach((report, index) => {
-      console.log(`Report ${index}:`, {
-        title: report.title,
-        lat: report.latitude,
-        lng: report.longitude
-      });
-    });
   }, []);
 
   const handleMarkerPress = (report: TheftReport) => {
     setSelectedReport(report);
-    setSelectedSafetyZone(null); // Clear safety zone selection
+    setSelectedSafetyZone(null);
     setShowDetails(true);
-    // Animate the modal up
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
@@ -181,9 +191,8 @@ const MapScreen: React.FC = () => {
 
   const handleSafetyZonePress = (zone: SafetyZone) => {
     setSelectedSafetyZone(zone);
-    setSelectedReport(null); // Clear report selection
+    setSelectedReport(null);
     setShowDetails(true);
-    // Animate the modal up
     Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
@@ -191,8 +200,15 @@ const MapScreen: React.FC = () => {
     }).start();
   };
 
+  const handleSafeAlternativePress = (alternative: SafeAlternative) => {
+    Alert.alert(
+      alternative.name,
+      `Safety Score: ${alternative.safetyScore}/10\nDistance from destination: ${(alternative.distanceFromDestination * 1000).toFixed(0)}m\nNearby thefts: ${alternative.theftCount}`,
+      [{ text: 'OK' }]
+    );
+  };
+
   const handleCloseDetails = () => {
-    // Animate the modal down
     Animated.timing(slideAnim, {
       toValue: 300,
       duration: 300,
@@ -201,30 +217,88 @@ const MapScreen: React.FC = () => {
       setShowDetails(false);
       setSelectedReport(null);
       setSelectedSafetyZone(null);
-      
-      // Return to user location if available
-      if (userLocation && mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude: userLocation.latitude,
-          longitude: userLocation.longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        }, 1000);
-      }
     });
-  };
-
-  const handleUserLocationChange = (location: any) => {
-    if (location?.coordinate) {
-      setUserLocation({
-        latitude: location.coordinate.latitude,
-        longitude: location.coordinate.longitude,
-      });
-    }
   };
 
   const handleBackPress = () => {
     router.back();
+  };
+
+  const handleSetDestination = async () => {
+    if (!destinationInput.trim()) {
+      Alert.alert('Error', 'Please enter a destination');
+      return;
+    }
+
+    // For demo, we'll use a fixed coordinate near USC
+    // In a real app, you'd use geocoding to convert address to coordinates
+    const demoDestination: Destination = {
+      latitude: 34.0199 + (Math.random() - 0.5) * 0.01,
+      longitude: -118.2899 + (Math.random() - 0.5) * 0.01,
+      name: destinationInput
+    };
+
+    setDestination(demoDestination);
+    setShowDirections(true);
+    
+    // Analyze the route
+    await analyzeRoute(demoDestination);
+  };
+
+  const analyzeRoute = async (dest: Destination) => {
+    if (!userLocation) {
+      Alert.alert('Error', 'User location not available');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('http://localhost:3001/api/analyze-route', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startLat: userLocation.latitude,
+          startLng: userLocation.longitude,
+          endLat: dest.latitude,
+          endLng: dest.longitude,
+          destinationName: dest.name
+        }),
+      });
+
+      if (response.ok) {
+        const analysis: RouteAnalysis = await response.json();
+        setRouteAnalysis(analysis);
+        setSafeAlternatives(analysis.safeAlternatives);
+        setShowRouteAnalysis(true);
+      } else {
+        Alert.alert('Error', 'Failed to analyze route');
+      }
+    } catch (error) {
+      console.error('Route analysis error:', error);
+      Alert.alert('Error', 'Failed to analyze route');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const clearRoute = () => {
+    setDestination(null);
+    setShowDirections(false);
+    setRouteAnalysis(null);
+    setSafeAlternatives([]);
+    setShowRouteAnalysis(false);
+    setDestinationInput('');
+  };
+
+  const getSafetyColor = (safetyLevel: string) => {
+    switch (safetyLevel) {
+      case 'Safe': return '#4CAF50';
+      case 'Moderate Risk': return '#FF9800';
+      case 'High Risk': return '#F44336';
+      default: return '#9E9E9E';
+    }
   };
 
   return (
@@ -242,20 +316,31 @@ const MapScreen: React.FC = () => {
         showsTraffic={false}
         mapType="mutedStandard"
         userInterfaceStyle="dark"
-        onUserLocationChange={handleUserLocationChange}
+        zoomEnabled={true}
+        scrollEnabled={true}
+        pitchEnabled={true}
+        rotateEnabled={true}
+        zoomTapEnabled={true}
+        zoomControlEnabled={true}
+        moveOnMarkerPress={false}
       >
         {/* Red markers for danger zones (theft reports) */}
         {reports.map((report, index) => {
+          // Ensure we have valid coordinates before rendering
+          if (!report.latitude || !report.longitude || 
+              isNaN(report.latitude) || isNaN(report.longitude)) {
+            console.warn(`Invalid coordinates for report ${index}:`, report);
+            return null;
+          }
+          
           console.log(`Rendering danger zone ${index} at:`, report.latitude, report.longitude);
           return (
             <Marker
-              key={`report-${report._id || index}`}
+              key={`danger-${report._id || `sample-${index}`}`}
               coordinate={{
-                latitude: report.latitude,
-                longitude: report.longitude,
+                latitude: Number(report.latitude),
+                longitude: Number(report.longitude),
               }}
-              title={report.title}
-              description={report.description}
               onPress={() => handleMarkerPress(report)}
               pinColor="red"
             />
@@ -269,16 +354,61 @@ const MapScreen: React.FC = () => {
             <Marker
               key={`safety-${zone.id}`}
               coordinate={{
-                latitude: zone.latitude,
-                longitude: zone.longitude,
+                latitude: Number(zone.latitude),
+                longitude: Number(zone.longitude),
               }}
-              title={zone.name}
-              description={zone.description}
               onPress={() => handleSafetyZonePress(zone)}
               pinColor="green"
             />
           );
         })}
+
+        {/* Green markers for safe alternatives */}
+        {safeAlternatives.map((alternative, index) => (
+          <Marker
+            key={`alternative-${index}`}
+            coordinate={{
+              latitude: alternative.latitude,
+              longitude: alternative.longitude,
+            }}
+            onPress={() => handleSafeAlternativePress(alternative)}
+            pinColor="green"
+          />
+        ))}
+
+        {/* Blue destination marker */}
+        {destination && (
+          <Marker
+            key="destination"
+            coordinate={{
+              latitude: destination.latitude,
+              longitude: destination.longitude,
+            }}
+            pinColor="blue"
+          />
+        )}
+
+        {/* Directions */}
+        {showDirections && userLocation && destination && (
+          <MapViewDirections
+            origin={userLocation}
+            destination={destination}
+            apikey={GOOGLE_MAPS_APIKEY}
+            strokeWidth={3}
+            strokeColor="#007AFF"
+            optimizeWaypoints={true}
+            onStart={(params) => {
+              console.log(`Started routing between "${params.origin}" and "${params.destination}"`);
+            }}
+            onReady={(result) => {
+              console.log(`Distance: ${result.distance} km`);
+              console.log(`Duration: ${result.duration} min.`);
+            }}
+            onError={(errorMessage) => {
+              console.log('Directions error:', errorMessage);
+            }}
+          />
+        )}
       </MapView>
 
       {/* Header */}
@@ -291,6 +421,75 @@ const MapScreen: React.FC = () => {
           <Text style={styles.headerSubtitle}>Report & Location</Text>
         </View>
       </View>
+
+      {/* Route Planning Controls */}
+      <View style={styles.routeControls}>
+        <View style={styles.routeInputContainer}>
+          <TextInput
+            style={styles.routeInput}
+            placeholder="Enter destination..."
+            placeholderTextColor="#8E8E93"
+            value={destinationInput}
+            onChangeText={setDestinationInput}
+          />
+          <TouchableOpacity 
+            style={styles.routeButton} 
+            onPress={handleSetDestination}
+            disabled={isAnalyzing}
+          >
+            <Text style={styles.routeButtonText}>
+              {isAnalyzing ? 'Analyzing...' : 'Analyze Route'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        
+        {showDirections && (
+          <TouchableOpacity style={styles.clearButton} onPress={clearRoute}>
+            <Text style={styles.clearButtonText}>Clear Route</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Route Analysis Results */}
+      {showRouteAnalysis && routeAnalysis && (
+        <View style={styles.routeAnalysisContainer}>
+          <View style={styles.routeAnalysisHeader}>
+            <Text style={styles.routeAnalysisTitle}>Route Safety Analysis</Text>
+            <TouchableOpacity onPress={() => setShowRouteAnalysis(false)}>
+              <Ionicons name="close" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.safetyLevelContainer}>
+            <Text style={styles.safetyLevelLabel}>Safety Level:</Text>
+            <Text style={[styles.safetyLevelValue, { color: getSafetyColor(routeAnalysis.safetyLevel) }]}>
+              {routeAnalysis.safetyLevel}
+            </Text>
+          </View>
+          
+          <Text style={styles.analysisText}>{routeAnalysis.analysis}</Text>
+          
+          <Text style={styles.nearbyTheftsText}>
+            Nearby theft reports: {routeAnalysis.nearbyThefts}
+          </Text>
+          
+          {routeAnalysis.safeAlternatives.length > 0 && (
+            <View style={styles.alternativesSection}>
+              <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
+              {routeAnalysis.safeAlternatives.slice(0, 3).map((alt, index) => (
+                <TouchableOpacity 
+                  key={index} 
+                  style={styles.alternativeItem}
+                  onPress={() => handleSafeAlternativePress(alt)}
+                >
+                  <Text style={styles.alternativeName}>{alt.name}</Text>
+                  <Text style={styles.alternativeScore}>Safety: {alt.safetyScore}/10</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
+      )}
 
       {/* Search bar at bottom */}
       <View style={styles.searchContainer}>
@@ -683,6 +882,131 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontSize: 14,
     lineHeight: 20,
+  },
+  
+  // Route planning styles
+  routeControls: {
+    position: 'absolute',
+    top: 120,
+    left: 20,
+    right: 20,
+    zIndex: 10,
+  },
+  routeInputContainer: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  routeInput: {
+    flex: 1,
+    backgroundColor: 'rgba(28, 28, 30, 0.9)',
+    color: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginRight: 10,
+    fontSize: 16,
+  },
+  routeButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 8,
+    justifyContent: 'center',
+  },
+  routeButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  clearButton: {
+    backgroundColor: 'rgba(255, 59, 48, 0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  clearButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 12,
+  },
+  
+  // Route analysis styles
+  routeAnalysisContainer: {
+    position: 'absolute',
+    top: 200,
+    left: 20,
+    right: 20,
+    backgroundColor: 'rgba(28, 28, 30, 0.95)',
+    borderRadius: 12,
+    padding: 16,
+    maxHeight: height * 0.4,
+    zIndex: 10,
+  },
+  routeAnalysisHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  routeAnalysisTitle: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  safetyLevelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  safetyLevelLabel: {
+    color: '#8E8E93',
+    fontSize: 16,
+    marginRight: 8,
+  },
+  safetyLevelValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  analysisText: {
+    color: '#E5E5E7',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  nearbyTheftsText: {
+    color: '#FF9500',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  alternativesSection: {
+    borderTopWidth: 1,
+    borderTopColor: '#2C2C2E',
+    paddingTop: 12,
+  },
+  alternativesTitle: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  alternativeItem: {
+    backgroundColor: 'rgba(48, 209, 88, 0.1)',
+    padding: 8,
+    borderRadius: 6,
+    marginBottom: 6,
+    borderLeftWidth: 3,
+    borderLeftColor: '#30D158',
+  },
+  alternativeName: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  alternativeScore: {
+    color: '#30D158',
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 

@@ -182,7 +182,7 @@ app.get('/api/parking-suggestions', async (req, res) => {
 
     const completion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt }],
-      model: "gpt-4o"
+      model: "gpt-4o-mini"
     });
 
     res.json({ suggestions: completion.choices[0].message.content });
@@ -190,6 +190,122 @@ app.get('/api/parking-suggestions', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// New endpoint to analyze route safety and suggest better parking spots
+app.post('/api/analyze-route', express.json(), async (req, res) => {
+  try {
+    const { startLat, startLng, endLat, endLng, destinationName } = req.body;
+    
+    if (!startLat || !startLng || !endLat || !endLng) {
+      return res.status(400).json({ error: 'Start and end coordinates required' });
+    }
+
+    // Get all theft reports from database
+    const reports = await ScooterReport.find({}).lean();
+    
+    // Calculate distance from destination to each theft report
+    const nearbyThefts = reports.filter(report => {
+      const distance = calculateDistance(endLat, endLng, report.latitude, report.longitude);
+      return distance <= 0.5; // Within 0.5km of destination
+    });
+
+    // Generate safe parking alternatives near the destination
+    const safeAlternatives = generateSafeAlternatives(endLat, endLng, reports);
+
+    // Use GPT-4o-mini to analyze the route and provide recommendations
+    const analysisPrompt = `
+    Analyze this scooter route for safety:
+    - Destination: ${destinationName || 'Unknown location'} (${endLat}, ${endLng})
+    - Nearby theft reports: ${nearbyThefts.length} incidents within 500m
+    - Theft details: ${nearbyThefts.map(t => t.description).join('; ')}
+    
+    Provide:
+    1. Safety assessment (Safe/Moderate Risk/High Risk)
+    2. Brief explanation (max 100 words)
+    3. Specific parking recommendations
+    `;
+
+    const completion = await openai.chat.completions.create({
+      messages: [{ role: "user", content: analysisPrompt }],
+      model: "gpt-4o-mini"
+    });
+
+    const analysis = completion.choices[0].message.content;
+
+    res.json({
+      safetyLevel: determineSafetyLevel(nearbyThefts.length),
+      nearbyThefts: nearbyThefts.length,
+      analysis: analysis,
+      safeAlternatives: safeAlternatives,
+      theftReports: nearbyThefts
+    });
+
+  } catch (err) {
+    console.error('Route analysis error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Helper function to calculate distance between two coordinates (Haversine formula)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Earth's radius in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// Helper function to determine safety level based on nearby thefts
+function determineSafetyLevel(theftCount) {
+  if (theftCount === 0) return 'Safe';
+  if (theftCount <= 2) return 'Moderate Risk';
+  return 'High Risk';
+}
+
+// Helper function to generate safe parking alternatives
+function generateSafeAlternatives(destLat, destLng, allReports) {
+  const alternatives = [];
+  const searchRadius = 0.3; // 300m radius
+  const gridSize = 0.002; // ~200m grid spacing
+  
+  // Generate potential parking spots in a grid around destination
+  for (let latOffset = -searchRadius; latOffset <= searchRadius; latOffset += gridSize) {
+    for (let lngOffset = -searchRadius; lngOffset <= searchRadius; lngOffset += gridSize) {
+      const candidateLat = destLat + latOffset;
+      const candidateLng = destLng + lngOffset;
+      
+      // Skip if too close to destination (user probably wants to park there)
+      const distToDestination = calculateDistance(destLat, destLng, candidateLat, candidateLng);
+      if (distToDestination < 0.1) continue;
+      
+      // Count nearby thefts for this candidate location
+      const nearbyThefts = allReports.filter(report => {
+        const distance = calculateDistance(candidateLat, candidateLng, report.latitude, report.longitude);
+        return distance <= 0.2; // Within 200m
+      }).length;
+      
+      // Only suggest locations with fewer thefts
+      if (nearbyThefts <= 1) {
+        alternatives.push({
+          latitude: candidateLat,
+          longitude: candidateLng,
+          theftCount: nearbyThefts,
+          distanceFromDestination: distToDestination,
+          safetyScore: Math.max(0, 10 - nearbyThefts * 3), // Simple scoring
+          name: `Safe Parking ${alternatives.length + 1}`
+        });
+      }
+    }
+  }
+  
+  // Sort by safety score and distance, return top 5
+  return alternatives
+    .sort((a, b) => b.safetyScore - a.safetyScore || a.distanceFromDestination - b.distanceFromDestination)
+    .slice(0, 5);
+}
 
 app.post('/api/login', express.json(), async (req, res) => {
   // Login logic with user lookup and UserID return
