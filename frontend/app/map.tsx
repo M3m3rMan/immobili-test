@@ -56,7 +56,7 @@ interface Destination {
   name: string;
 }
 
-const GOOGLE_MAPS_APIKEY = 'YOUR_GOOGLE_MAPS_API_KEY'; // Replace with your API key
+const GOOGLE_MAPS_APIKEY = 'AIzaSyASv3U2e0Td2KUAjvnBii1Oj2CcxLCZdhc'; // Replace with your API key
 
 // USC coordinates
 const USC_COORDINATES = {
@@ -89,7 +89,7 @@ const SAFETY_ZONES: SafetyZone[] = [
 // Sample reports near USC
 const SAMPLE_REPORTS: TheftReport[] = [
   {
-    _id: '2',
+    _id: '1',
     raw: 'Attempted theft of red electric scooter near USC Village. Suspect fled when approached by security. No injuries reported.',
     location: 'USC Village',
     latitude: 34.0251,
@@ -98,6 +98,77 @@ const SAMPLE_REPORTS: TheftReport[] = [
     description: 'Suspect fled when approached',
     date: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
   },
+    {
+    _id: '2',
+    raw: 'Electric scooter stolen from Exposition Park area. Victim reported scooter missing from parking area.',
+    location: 'Exposition Park',
+    latitude: 34.0189,
+    longitude: -118.2820,
+    title: 'Electric Scooter Stolen',
+    description: 'Scooter missing from parking area',
+    date: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+  },
+  {
+    _id: '3',
+    raw: 'Attempted theft of e-scooter near USC Campus. Suspect fled when confronted.',
+    location: 'USC Campus',
+    latitude: 34.0224,
+    longitude: -118.2851,
+    title: 'Attempted E-Scooter Theft',
+    description: 'Suspect fled when confronted',
+    date: new Date(Date.now() - 259200000).toISOString(), // 3 days ago
+  },
+  {
+    _id: '4',
+    raw: 'Red electric scooter theft reported near USC North area. Lock was cut.',
+    location: 'USC North',
+    latitude: 34.0260,
+    longitude: -118.2830,
+    title: 'Red E-Scooter Theft',
+    description: 'Lock was cut, scooter stolen',
+    date: new Date(Date.now() - 345600000).toISOString(), // 4 days ago
+  },
+  {
+    _id: '5',
+    raw: 'Blue scooter stolen from USC South parking area during evening hours.',
+    location: 'USC South',
+    latitude: 34.0180,
+    longitude: -118.2880,
+    title: 'Blue Scooter Theft',
+    description: 'Stolen during evening hours',
+    date: new Date(Date.now() - 432000000).toISOString(), // 5 days ago
+  },
+  {
+    _id: '6',
+    raw: 'E-scooter theft incident at USC East. Scooter was secured but lock was broken.',
+    location: 'USC East',
+    latitude: 34.0230,
+    longitude: -118.2810,
+    title: 'E-Scooter Theft - Lock Broken',
+    description: 'Secured scooter, lock was broken',
+    date: new Date(Date.now() - 518400000).toISOString(), // 6 days ago
+  },
+  {
+    _id: '7',
+    raw: 'White electric scooter reported stolen from USC West area near dormitories.',
+    location: 'USC West',
+    latitude: 34.0200,
+    longitude: -118.2920,
+    title: 'White E-Scooter Theft',
+    description: 'Stolen near dormitories',
+    date: new Date(Date.now() - 604800000).toISOString(), // 7 days ago
+  },
+  {
+    _id: '8',
+    raw: 'Scooter theft attempt foiled by security at USC Central area.',
+    location: 'USC Central',
+    latitude: 34.0245,
+    longitude: -118.2865,
+    title: 'Theft Attempt Foiled',
+    description: 'Security prevented theft',
+    date: new Date(Date.now() - 691200000).toISOString(), // 8 days ago
+  }
+  
 ];
 
 const MapScreen: React.FC = () => {
@@ -107,6 +178,7 @@ const MapScreen: React.FC = () => {
   const [safetyZones] = useState<SafetyZone[]>(SAFETY_ZONES);
   const [selectedReport, setSelectedReport] = useState<TheftReport | null>(null);
   const [selectedSafetyZone, setSelectedSafetyZone] = useState<SafetyZone | null>(null);
+  const [selectedSafeAlternative, setSafeAlternative] = useState<SafeAlternative | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [userLocation, setUserLocation] = useState<{latitude: number, longitude: number} | null>(null);
   const [initialRegion, setInitialRegion] = useState(USC_COORDINATES);
@@ -118,6 +190,25 @@ const MapScreen: React.FC = () => {
   const [showRouteAnalysis, setShowRouteAnalysis] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const slideAnim = useState(new Animated.Value(300))[0];
+
+  // Helper function to get marker icons
+  const getMarkerIcon = (type: 'danger' | 'safety' | 'alternative' | 'destination') => {
+    switch (type) {
+      case 'danger':
+        return require('../assets/images/map/red_error.png');
+      case 'safety':
+        // You can add a green safety icon here if you have one
+        return null; // Will use default green pin
+      case 'alternative':
+        // You can add a blue alternative icon here if you have one  
+        return null; // Will use default green pin
+      case 'destination':
+        // You can add a blue destination icon here if you have one
+        return null; // Will use default blue pin
+      default:
+        return null;
+    }
+  };
 
   useEffect(() => {
     // Request location permissions and get current location
@@ -324,7 +415,7 @@ const MapScreen: React.FC = () => {
         zoomControlEnabled={true}
         moveOnMarkerPress={false}
       >
-        {/* Red markers for danger zones (theft reports) */}
+        {/* Custom warning markers for danger zones (theft reports) */}
         {reports.map((report, index) => {
           // Ensure we have valid coordinates before rendering
           if (!report.latitude || !report.longitude || 
@@ -342,7 +433,7 @@ const MapScreen: React.FC = () => {
                 longitude: Number(report.longitude),
               }}
               onPress={() => handleMarkerPress(report)}
-              pinColor="red"
+              image={getMarkerIcon('danger')}
             />
           );
         })}
@@ -358,7 +449,8 @@ const MapScreen: React.FC = () => {
                 longitude: Number(zone.longitude),
               }}
               onPress={() => handleSafetyZonePress(zone)}
-              pinColor="green"
+              image={getMarkerIcon('safety')}
+              pinColor="green" // Fallback if no custom image
             />
           );
         })}
@@ -372,7 +464,8 @@ const MapScreen: React.FC = () => {
               longitude: alternative.longitude,
             }}
             onPress={() => handleSafeAlternativePress(alternative)}
-            pinColor="green"
+            image={getMarkerIcon('alternative')}
+            pinColor="green" // Fallback if no custom image
           />
         ))}
 
@@ -384,7 +477,8 @@ const MapScreen: React.FC = () => {
               latitude: destination.latitude,
               longitude: destination.longitude,
             }}
-            pinColor="blue"
+            image={getMarkerIcon('destination')}
+            pinColor="blue" // Fallback if no custom image
           />
         )}
 
@@ -417,8 +511,6 @@ const MapScreen: React.FC = () => {
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
         <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Ai Analyzer</Text>
-          <Text style={styles.headerSubtitle}>Report & Location</Text>
         </View>
       </View>
 

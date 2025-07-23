@@ -45,6 +45,9 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+  "GOOGLE_MAPS_API_KEY": "AIzaSyASv3U2e0Td2KUAjvnBii1Oj2CcxLCZdhc"
+}
   }
 }

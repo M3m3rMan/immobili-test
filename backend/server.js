@@ -9,6 +9,7 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
+app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
@@ -34,6 +35,50 @@ const User = mongoose.model('User', UserSchema);
 
 const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
 
+// Function to calculate distance between two coordinates in kilometers
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the Earth in kilometers
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const d = R * c; // Distance in kilometers
+  return d;
+}
+
+// Function to check if a report is a valid crime (not service/administrative)
+function isValidCrime(reportText, location) {
+  const nonCrimeKeywords = [
+    'service', 'no crime', 'administrative', 'disposition', 'closed',
+    'unfounded', 'report writing', 'information', 'assist', 'welfare check',
+    'civil', 'traffic stop', 'parking', 'noise complaint', 'animal'
+  ];
+  
+  const crimeKeywords = [
+    'theft', 'stolen', 'robbery', 'burglary', 'larceny', 'vandalism',
+    'assault', 'battery', 'fraud', 'scam', 'break', 'breaking'
+  ];
+  
+  const textLower = reportText.toLowerCase();
+  const locationLower = location ? location.toLowerCase() : '';
+  
+  // Check if it contains non-crime keywords
+  const hasNonCrime = nonCrimeKeywords.some(keyword => 
+    textLower.includes(keyword) || locationLower.includes(keyword)
+  );
+  
+  // Check if it contains crime keywords
+  const hasCrime = crimeKeywords.some(keyword => 
+    textLower.includes(keyword) || locationLower.includes(keyword)
+  );
+  
+  // Return true only if it has crime keywords and no non-crime keywords
+  return hasCrime && !hasNonCrime;
+}
+
 // Utility to extract scooter reports from PDF text
 function extractScooterReports(text) {
   const reports = [];
@@ -45,16 +90,26 @@ function extractScooterReports(text) {
     /incident[\s\S]*?(?:scooter|e-scooter)[\s\S]*?(?:theft|stolen)[\s\S]*?$/gmi
   ];
 
-  // LA coordinates for different areas (sample locations)
-  const laCoordinates = [
-    { lat: 34.0522, lng: -118.2437, area: "Downtown LA" },
-    { lat: 34.0928, lng: -118.3287, area: "Hollywood" },
-    { lat: 34.0736, lng: -118.4004, area: "Santa Monica" },
-    { lat: 34.1478, lng: -118.1445, area: "Pasadena" },
-    { lat: 34.0195, lng: -118.4912, area: "Venice" },
-    { lat: 34.1030, lng: -118.4107, area: "Beverly Hills" },
-    { lat: 34.0259, lng: -118.7798, area: "Malibu" },
-    { lat: 34.1684, lng: -118.6058, area: "Woodland Hills" }
+  // USC area coordinates for more realistic demo data (2318 Hoover Street area)
+  const uscCenterCoord = { lat: 34.0224, lng: -118.2851 }; // USC center
+  const maxDistanceKm = 3; // 3km radius around USC
+  
+  const uscAreaCoordinates = [
+    { lat: 34.0224, lng: -118.2851, area: "USC Campus" },
+    { lat: 34.0251, lng: -118.2851, area: "USC Village" },
+    { lat: 34.0199, lng: -118.2899, area: "USC Vicinity" },
+    { lat: 34.0189, lng: -118.2820, area: "Exposition Park" },
+    { lat: 34.0240, lng: -118.2790, area: "Downtown USC" },
+    { lat: 34.0210, lng: -118.2870, area: "USC Area" },
+    { lat: 34.0260, lng: -118.2830, area: "USC North" },
+    { lat: 34.0180, lng: -118.2880, area: "USC South" },
+    { lat: 34.0230, lng: -118.2810, area: "USC East" },
+    { lat: 34.0200, lng: -118.2920, area: "USC West" },
+    { lat: 34.0245, lng: -118.2865, area: "USC Central" },
+    { lat: 34.0215, lng: -118.2845, area: "USC Perimeter" },
+    { lat: 34.0235, lng: -118.2875, area: "USC Neighborhood" },
+    { lat: 34.0205, lng: -118.2835, area: "USC District" },
+    { lat: 34.0255, lng: -118.2855, area: "USC Zone" }
   ];
 
   patterns.forEach(pattern => {
@@ -66,19 +121,27 @@ function extractScooterReports(text) {
       const locationMatch = /(?:location|address|street)[\s:]*([^\n\r.]+)/i.exec(reportText);
       const location = locationMatch ? locationMatch[1].trim() : null;
       
-      if (location && reportText.toLowerCase().includes('scooter')) {
-        // Assign random LA coordinates for demo purposes
-        const randomCoord = laCoordinates[Math.floor(Math.random() * laCoordinates.length)];
+      // Only include if it's a valid crime and contains scooter reference
+      if (location && reportText.toLowerCase().includes('scooter') && isValidCrime(reportText, location)) {
+        // Assign random USC area coordinates for demo purposes
+        const randomCoord = uscAreaCoordinates[Math.floor(Math.random() * uscAreaCoordinates.length)];
+        const finalLat = randomCoord.lat + (Math.random() - 0.5) * 0.01;
+        const finalLng = randomCoord.lng + (Math.random() - 0.5) * 0.01;
         
-        reports.push({
-          raw: reportText,
-          location: location,
-          latitude: randomCoord.lat + (Math.random() - 0.5) * 0.01, // Add small random offset
-          longitude: randomCoord.lng + (Math.random() - 0.5) * 0.01,
-          title: "E-Scooter Theft Reported",
-          description: reportText.substring(0, 100) + "...",
-          processed: false
-        });
+        // Check if the coordinates are within USC area perimeter
+        const distanceFromUSC = calculateDistance(uscCenterCoord.lat, uscCenterCoord.lng, finalLat, finalLng);
+        
+        if (distanceFromUSC <= maxDistanceKm) {
+          reports.push({
+            raw: reportText,
+            location: location,
+            latitude: finalLat,
+            longitude: finalLng,
+            title: "E-Scooter Theft Reported",
+            description: reportText.substring(0, 100) + "...",
+            processed: false
+          });
+        }
       }
     }
   });
@@ -87,41 +150,77 @@ function extractScooterReports(text) {
   if (reports.length === 0) {
     const sampleReports = [
       {
-        raw: "E-scooter theft reported at 123 Main St, Downtown LA. Black scooter taken from bike rack.",
-        location: "123 Main St, Downtown LA",
-        latitude: 34.0522,
-        longitude: -118.2437,
+        raw: "E-scooter theft reported at USC Village. Black scooter taken from bike rack.",
+        location: "USC Village",
+        latitude: 34.0251,
+        longitude: -118.2851,
         title: "E-Scooter Theft Reported",
         description: "Black scooter taken from bike rack",
         processed: false
       },
       {
-        raw: "Electric scooter stolen from Hollywood Blvd. Victim reported scooter missing from parking area.",
-        location: "Hollywood Blvd, Hollywood",
-        latitude: 34.0928,
-        longitude: -118.3287,
+        raw: "Electric scooter stolen from Exposition Park area. Victim reported scooter missing from parking area.",
+        location: "Exposition Park",
+        latitude: 34.0189,
+        longitude: -118.2820,
         title: "Electric Scooter Stolen",
         description: "Scooter missing from parking area",
         processed: false
       },
       {
-        raw: "Attempted theft of e-scooter at Santa Monica Pier. Suspect fled when confronted.",
-        location: "Santa Monica Pier",
-        latitude: 34.0736,
-        longitude: -118.4004,
+        raw: "Attempted theft of e-scooter near USC Campus. Suspect fled when confronted.",
+        location: "USC Campus",
+        latitude: 34.0224,
+        longitude: -118.2851,
         title: "Attempted E-Scooter Theft",
         description: "Suspect fled when confronted",
         processed: false
       }
     ];
+    
+    // Generate additional sample reports to reach 15 total
+    const additionalLocations = [
+      { name: "USC North", lat: 34.0260, lng: -118.2830 },
+      { name: "USC South", lat: 34.0180, lng: -118.2880 },
+      { name: "USC East", lat: 34.0230, lng: -118.2810 },
+      { name: "USC West", lat: 34.0200, lng: -118.2920 },
+      { name: "USC Central", lat: 34.0245, lng: -118.2865 },
+      { name: "USC Perimeter", lat: 34.0215, lng: -118.2845 },
+      { name: "USC Neighborhood", lat: 34.0235, lng: -118.2875 },
+      { name: "USC District", lat: 34.0205, lng: -118.2835 },
+      { name: "USC Zone", lat: 34.0255, lng: -118.2855 },
+      { name: "Downtown USC", lat: 34.0240, lng: -118.2790 },
+      { name: "USC Area", lat: 34.0210, lng: -118.2870 },
+      { name: "USC Vicinity", lat: 34.0199, lng: -118.2899 }
+    ];
+    
+    additionalLocations.forEach((loc, index) => {
+      sampleReports.push({
+        raw: `E-scooter theft incident reported at ${loc.name}. Scooter was secured but lock was cut.`,
+        location: loc.name,
+        latitude: loc.lat + (Math.random() - 0.5) * 0.002, // Small random offset
+        longitude: loc.lng + (Math.random() - 0.5) * 0.002,
+        title: "E-Scooter Theft Reported",
+        description: `Theft incident at ${loc.name}`,
+        processed: false
+      });
+    });
+    
     reports.push(...sampleReports);
   }
 
   return reports;
 }
 
+// Test endpoint to verify server is working
+app.get('/api/test', (req, res) => {
+  console.log('Test endpoint called');
+  res.json({ message: 'Server is working', timestamp: new Date().toISOString() });
+});
+
 // Endpoint to get scooter reports from a PDF file and save to MongoDB
 app.get('/api/scooter-reports', async (req, res) => {
+  console.log('GET /api/scooter-reports endpoint called');
   try {
     // Check if we already have processed reports in the database
     const existingReports = await ScooterReport.find({});
@@ -161,9 +260,32 @@ app.get('/api/scooter-reports', async (req, res) => {
       }
     }
 
-    // Return all reports from database
+    // Return filtered reports from database (only valid crimes within USC area)
     const allReports = await ScooterReport.find({}).lean();
-    res.json({ reports: allReports });
+    console.log(`Found ${allReports.length} total reports in database`);
+    
+    const uscCenterCoord = { lat: 34.0224, lng: -118.2851 }; // USC center
+    const maxDistanceKm = 3; // 3km radius around USC
+    
+    const filteredReports = allReports.filter(report => {
+      // Check if it's within USC area
+      const distanceFromUSC = calculateDistance(
+        uscCenterCoord.lat, 
+        uscCenterCoord.lng, 
+        report.latitude, 
+        report.longitude
+      );
+      
+      // Check if it's a valid crime
+      const isValidCrimeReport = isValidCrime(report.raw || '', report.location || '');
+      
+      console.log(`Report: location="${report.location}", distance=${distanceFromUSC.toFixed(2)}km, isValidCrime=${isValidCrimeReport}`);
+      
+      return distanceFromUSC <= maxDistanceKm && isValidCrimeReport;
+    });
+    
+    console.log(`Filtered ${allReports.length} reports to ${filteredReports.length} valid crimes in USC area`);
+    res.json({ reports: filteredReports });
     
   } catch (err) {
     console.error('Error processing reports:', err);
@@ -171,6 +293,25 @@ app.get('/api/scooter-reports', async (req, res) => {
   }
 });
 
+// Endpoint to clear all reports (for testing)
+app.delete('/api/scooter-reports', express.json(), async (req, res) => {
+  try {
+    await ScooterReport.deleteMany({});
+    res.json({ message: 'All reports cleared' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Alternative endpoint to clear all reports (for testing)
+app.get('/api/clear-reports', async (req, res) => {
+  try {
+    await ScooterReport.deleteMany({});
+    res.json({ message: 'All reports cleared' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Endpoint to get parking suggestions using OpenAI
 app.get('/api/parking-suggestions', async (req, res) => {
@@ -245,18 +386,6 @@ app.post('/api/analyze-route', express.json(), async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// Helper function to calculate distance between two coordinates (Haversine formula)
-function calculateDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth's radius in kilometers
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c;
-}
 
 // Helper function to determine safety level based on nearby thefts
 function determineSafetyLevel(theftCount) {
