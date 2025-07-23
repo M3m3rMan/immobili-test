@@ -360,10 +360,12 @@ app.post('/api/analyze-route', express.json(), async (req, res) => {
     - Nearby theft reports: ${nearbyThefts.length} incidents within 500m
     - Theft details: ${nearbyThefts.map(t => t.description).join('; ')}
     
-    Provide:
-    1. Safety assessment (Safe/Moderate Risk/High Risk)
-    2. Brief explanation (max 100 words)
-    3. Specific parking recommendations
+    Provide a VERY SHORT response with:
+    1. **Safety Assessment:** Safe/Moderate Risk/High Risk
+    2. **Brief Explanation:** One sentence only (max 25 words) explaining why it's safe/unsafe
+    3. **Specific Parking Recommendations:** One short tip (max 15 words)
+    
+    Keep it simple and easy to read on mobile. Use bullet points.
     `;
 
     const completion = await openai.chat.completions.create({

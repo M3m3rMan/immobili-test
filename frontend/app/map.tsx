@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Image, Text, StyleSheet, Pressable, TextInput, ScrollView, Animated, Alert, Platform, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Image, Text, StyleSheet, Pressable, TextInput, ScrollView, Animated, Alert, Platform, TouchableOpacity, Dimensions, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import MapView, { Marker } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
@@ -190,6 +190,11 @@ const MapScreen: React.FC = () => {
   const [showRouteAnalysis, setShowRouteAnalysis] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const slideAnim = useState(new Animated.Value(300))[0];
+  
+  // Add keyboard state management
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const searchContainerAnim = useRef(new Animated.Value(0)).current;
 
   // Helper function to get marker icons
   const getMarkerIcon = (type: 'danger' | 'warning' | 'safety' | 'alternative' | 'destination') => {
@@ -264,7 +269,7 @@ const MapScreen: React.FC = () => {
     const fetchReports = async () => {
       try {
         console.log('Fetching reports from backend...');
-        const res = await fetch('http://localhost:3001/api/scooter-reports');
+        const res = await fetch('http://192.168.1.139:3001/api/scooter-reports');
         const data = await res.json();
         if (data.reports && data.reports.length > 0) {
           // Get 20 reports for danger zones
@@ -282,6 +287,42 @@ const MapScreen: React.FC = () => {
     };
 
     fetchReports();
+
+    // Keyboard event listeners
+    const keyboardWillShowListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (event) => {
+        setKeyboardHeight(event.endCoordinates.height);
+        setIsKeyboardVisible(true);
+        
+        // Animate the search container up
+        Animated.timing(searchContainerAnim, {
+          toValue: -event.endCoordinates.height + 34, // 34 is the safe area bottom padding
+          duration: Platform.OS === 'ios' ? event.duration : 250,
+          useNativeDriver: false,
+        }).start();
+      }
+    );
+
+    const keyboardWillHideListener = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      (event) => {
+        setKeyboardHeight(0);
+        setIsKeyboardVisible(false);
+        
+        // Animate the search container back down
+        Animated.timing(searchContainerAnim, {
+          toValue: 0,
+          duration: Platform.OS === 'ios' ? event.duration : 250,
+          useNativeDriver: false,
+        }).start();
+      }
+    );
+
+    return () => {
+      keyboardWillShowListener?.remove();
+      keyboardWillHideListener?.remove();
+    };
   }, []);
 
   const handleMarkerPress = (report: TheftReport) => {
@@ -307,11 +348,15 @@ const MapScreen: React.FC = () => {
   };
 
   const handleSafeAlternativePress = (alternative: SafeAlternative) => {
-    Alert.alert(
-      alternative.name,
-      `Safety Score: ${alternative.safetyScore}/10\nDistance from destination: ${(alternative.distanceFromDestination * 1000).toFixed(0)}m\nNearby thefts: ${alternative.theftCount}`,
-      [{ text: 'OK' }]
-    );
+    setSafeAlternative(alternative);
+    setSelectedReport(null);
+    setSelectedSafetyZone(null);
+    setShowDetails(true);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleCloseDetails = () => {
@@ -323,6 +368,7 @@ const MapScreen: React.FC = () => {
       setShowDetails(false);
       setSelectedReport(null);
       setSelectedSafetyZone(null);
+      setSafeAlternative(null);
     });
   };
 
@@ -359,7 +405,7 @@ const MapScreen: React.FC = () => {
 
     setIsAnalyzing(true);
     try {
-      const response = await fetch('http://localhost:3001/api/analyze-route', {
+      const response = await fetch('http://192.168.1.139:3001/api/analyze-route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -398,7 +444,90 @@ const MapScreen: React.FC = () => {
     setDestinationInput('');
   };
 
-  const getSafetyColor = (safetyLevel: string) => {
+  // MarkdownText component for rendering formatted text
+const MarkdownText: React.FC<{ text: string; style?: any }> = ({ text, style }) => {
+  const renderMarkdown = (text: string) => {
+    const lines = text.split('\n');
+    const elements: React.ReactNode[] = [];
+    
+    lines.forEach((line, index) => {
+      const trimmedLine = line.trim();
+      
+      if (!trimmedLine) {
+        elements.push(<View key={`space-${index}`} style={{ height: 8 }} />);
+        return;
+      }
+      
+      // Headers
+      if (trimmedLine.startsWith('## ')) {
+        elements.push(
+          <Text key={index} style={[styles.markdownH2, style]}>
+            {trimmedLine.substring(3)}
+          </Text>
+        );
+      } else if (trimmedLine.startsWith('### ')) {
+        elements.push(
+          <Text key={index} style={[styles.markdownH3, style]}>
+            {trimmedLine.substring(4)}
+          </Text>
+        );
+      }
+      // Numbered lists
+      else if (/^\d+\.\s/.test(trimmedLine)) {
+        const match = trimmedLine.match(/^(\d+)\.\s(.+)$/);
+        if (match) {
+          elements.push(
+            <View key={index} style={styles.markdownBulletContainer}>
+              <Text style={styles.markdownNumber}>{match[1]}.</Text>
+              <Text style={[styles.markdownBulletText, style]}>
+                {renderInlineMarkdown(match[2])}
+              </Text>
+            </View>
+          );
+        }
+      }
+      // Bullet points
+      else if (trimmedLine.startsWith('• ') || trimmedLine.startsWith('- ')) {
+        elements.push(
+          <View key={index} style={styles.markdownBulletContainer}>
+            <Text style={styles.markdownBullet}>•</Text>
+            <Text style={[styles.markdownBulletText, style]}>
+              {renderInlineMarkdown(trimmedLine.substring(2))}
+            </Text>
+          </View>
+        );
+      }
+      // Regular paragraphs
+      else {
+        elements.push(
+          <Text key={index} style={[styles.markdownParagraph, style]}>
+            {renderInlineMarkdown(trimmedLine)}
+          </Text>
+        );
+      }
+    });
+    
+    return elements;
+  };
+  
+  const renderInlineMarkdown = (text: string) => {
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((part, index) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <Text key={index} style={styles.markdownBold}>
+            {part.slice(2, -2)}
+          </Text>
+        );
+      }
+      return part;
+    });
+  };
+  
+  return <View>{renderMarkdown(text)}</View>;
+};
+
+const getSafetyColor = (safetyLevel: string) => {
     switch (safetyLevel) {
       case 'Safe': return '#4CAF50';
       case 'Moderate Risk': return '#FF9800';
@@ -408,14 +537,27 @@ const MapScreen: React.FC = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Pressable style={styles.backButton} onPress={handleBackPress}>
+          <Text style={styles.backArrow}>←</Text>
+        </Pressable>
+        <View style={styles.headerContent}>
+        </View>
+      </View>
+
       {/* Main map view with dynamic location and dark mode */}
       <MapView
         ref={mapRef}
         style={styles.mapView}
         initialRegion={initialRegion}
         showsUserLocation={true}
-        showsMyLocationButton={true}
+        showsMyLocationButton={false}
         showsCompass={false}
         showsScale={false}
         showsBuildings={true}
@@ -429,6 +571,10 @@ const MapScreen: React.FC = () => {
         zoomTapEnabled={true}
         zoomControlEnabled={true}
         moveOnMarkerPress={false}
+        onPress={() => {
+          // Dismiss keyboard when tapping on map
+          Keyboard.dismiss();
+        }}
       >
         {/* Custom warning markers for danger zones (theft reports) */}
         {reports.map((report, index) => {
@@ -507,7 +653,7 @@ const MapScreen: React.FC = () => {
             origin={userLocation}
             destination={destination}
             apikey={GOOGLE_MAPS_APIKEY}
-            strokeWidth={3}
+            strokeWidth={10}
             strokeColor="#007AFF"
             optimizeWaypoints={true}
             onStart={(params) => {
@@ -524,17 +670,17 @@ const MapScreen: React.FC = () => {
         )}
       </MapView>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={handleBackPress}>
-          <Text style={styles.backArrow}>←</Text>
-        </Pressable>
-        <View style={styles.headerContent}>
-        </View>
-      </View>
-
-      {/* Bottom container with route planning and search */}
-      <View style={styles.searchContainer}>
+      {/* Bottom container with route planning and search - now animated */}
+      <Animated.View 
+        style={[
+          styles.searchContainer,
+          {
+            transform: [{ translateY: searchContainerAnim }],
+            // Adjust max height when keyboard is visible
+            maxHeight: isKeyboardVisible ? height * 0.4 : height * 0.7,
+          }
+        ]}
+      >
         <View style={styles.searchHandle} />
         
         {/* Route Planning Controls */}
@@ -545,6 +691,16 @@ const MapScreen: React.FC = () => {
             placeholderTextColor="#8E8E93"
             value={destinationInput}
             onChangeText={setDestinationInput}
+            onFocus={() => {
+              // Optional: Add any additional focus behavior here
+              console.log('Input focused');
+            }}
+            onBlur={() => {
+              // Optional: Add any additional blur behavior here
+              console.log('Input blurred');
+            }}
+            returnKeyType="search"
+            onSubmitEditing={handleSetDestination}
           />
           <TouchableOpacity 
             style={styles.routeButton} 
@@ -580,7 +736,7 @@ const MapScreen: React.FC = () => {
               </Text>
             </View>
             
-            <Text style={styles.analysisText}>{routeAnalysis.analysis}</Text>
+            <MarkdownText text={routeAnalysis.analysis} />
             
             <Text style={styles.nearbyTheftsText}>
               Nearby theft reports: {routeAnalysis.nearbyThefts}
@@ -603,7 +759,7 @@ const MapScreen: React.FC = () => {
             )}
           </View>
         )}
-      </View>
+      </Animated.View>
 
       {/* Report details modal - Citizen app style */}
       {showDetails && selectedReport && (
@@ -727,7 +883,76 @@ const MapScreen: React.FC = () => {
           </ScrollView>
         </Animated.View>
       )}
-    </View>
+
+      {/* Safe alternative details modal */}
+      {showDetails && selectedSafeAlternative && (
+        <Animated.View 
+          style={[
+            styles.detailsModal,
+            {
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          <View style={styles.modalHandle} />
+          
+          {/* Quick summary card for safe alternative */}
+          <View style={styles.summaryCard}>
+            <View style={styles.safetyIcon}>
+              <Text style={styles.safetyEmoji}>🅿️</Text>
+            </View>
+            <View style={styles.summaryContent}>
+              <Text style={styles.summaryTitle}>{selectedSafeAlternative.name}</Text>
+              <Text style={styles.summaryLocation}>Safe Parking Alternative</Text>
+              <Text style={styles.summaryTime}>
+                Distance from destination: {(selectedSafeAlternative.distanceFromDestination * 1000).toFixed(0)}m
+              </Text>
+            </View>
+            <Pressable style={styles.closeButton} onPress={handleCloseDetails}>
+              <Text style={styles.closeText}>×</Text>
+            </Pressable>
+          </View>
+
+          {/* Scrollable detailed content */}
+          <ScrollView 
+            style={styles.detailsScroll}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.detailsContent}>
+              <Text style={styles.detailsTitle}>Safe Parking Information</Text>
+              <Text style={styles.detailsDescription}>
+                This location has been identified as a safer alternative for parking your scooter based on historical theft data and proximity to your destination.
+              </Text>
+              
+              <View style={styles.statusContainer}>
+                <View style={styles.statusItem}>
+                  <Text style={styles.statusLabel}>Safety Score</Text>
+                  <Text style={styles.statusValueGreen}>
+                    {selectedSafeAlternative.safetyScore}/10
+                  </Text>
+                </View>
+                <View style={styles.statusItem}>
+                  <Text style={styles.statusLabel}>Nearby Thefts</Text>
+                  <Text style={styles.statusValueGreen}>
+                    {selectedSafeAlternative.theftCount}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.fullReportSection}>
+                <Text style={styles.fullReportTitle}>Safety Tips</Text>
+                <Text style={styles.fullReportText}>
+                  • Park in well-lit areas{'\n'}
+                  • Use proper locking mechanisms{'\n'}
+                  • Avoid leaving valuables visible{'\n'}
+                  • Consider the walking distance to your destination
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      )}
+    </KeyboardAvoidingView>
   );
 };
 
