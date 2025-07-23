@@ -192,22 +192,37 @@ const MapScreen: React.FC = () => {
   const slideAnim = useState(new Animated.Value(300))[0];
 
   // Helper function to get marker icons
-  const getMarkerIcon = (type: 'danger' | 'safety' | 'alternative' | 'destination') => {
+  const getMarkerIcon = (type: 'danger' | 'warning' | 'safety' | 'alternative' | 'destination') => {
     switch (type) {
       case 'danger':
         return require('../assets/images/map/red_error.png');
+      case 'warning':
+        return require('../assets/images/map/yellow_error.png');
       case 'safety':
-        // You can add a green safety icon here if you have one
-        return null; // Will use default green pin
+        return require('../assets/images/map/Ellipse 15.png');
       case 'alternative':
-        // You can add a blue alternative icon here if you have one  
-        return null; // Will use default green pin
+        return require('../assets/images/map/Ellipse 15.png');
       case 'destination':
         // You can add a blue destination icon here if you have one
         return null; // Will use default blue pin
       default:
         return null;
     }
+  };
+
+  // Helper function to determine report severity
+  const getReportSeverity = (report: TheftReport) => {
+    const title = report.title.toLowerCase();
+    const description = report.description.toLowerCase();
+    const raw = report.raw.toLowerCase();
+    
+    if (title.includes('attempted') || description.includes('attempted') || raw.includes('attempted') ||
+        title.includes('foiled') || description.includes('foiled') || raw.includes('foiled') ||
+        title.includes('prevented') || description.includes('prevented') || raw.includes('prevented')) {
+      return 'attempted';
+    }
+    
+    return 'completed';
   };
 
   useEffect(() => {
@@ -424,16 +439,20 @@ const MapScreen: React.FC = () => {
             return null;
           }
           
-          console.log(`Rendering danger zone ${index} at:`, report.latitude, report.longitude);
+          // Determine marker type based on report severity
+          const severity = getReportSeverity(report);
+          const markerType = severity === 'attempted' ? 'warning' : 'danger';
+          
+          console.log(`Rendering ${markerType} zone ${index} at:`, report.latitude, report.longitude);
           return (
             <Marker
-              key={`danger-${report._id || `sample-${index}`}`}
+              key={`${markerType}-${report._id || `sample-${index}`}`}
               coordinate={{
                 latitude: Number(report.latitude),
                 longitude: Number(report.longitude),
               }}
               onPress={() => handleMarkerPress(report)}
-              image={getMarkerIcon('danger')}
+              image={getMarkerIcon(markerType)}
             />
           );
         })}
