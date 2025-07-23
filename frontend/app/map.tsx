@@ -260,15 +260,15 @@ const MapScreen: React.FC = () => {
 
     getLocationPermission();
 
-    // Fetch reports from backend - get 10 danger zones
+    // Fetch reports from backend - get 20 danger zones
     const fetchReports = async () => {
       try {
         console.log('Fetching reports from backend...');
         const res = await fetch('http://localhost:3001/api/scooter-reports');
         const data = await res.json();
         if (data.reports && data.reports.length > 0) {
-          // Get 10 reports for danger zones
-          const dangerZones = data.reports.slice(0, 10);
+          // Get 20 reports for danger zones
+          const dangerZones = data.reports.slice(0, 20);
           setReports(dangerZones);
           console.log(`Loaded ${dangerZones.length} danger zones from backend`);
         } else {
@@ -533,8 +533,11 @@ const MapScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Route Planning Controls */}
-      <View style={styles.routeControls}>
+      {/* Bottom container with route planning and search */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchHandle} />
+        
+        {/* Route Planning Controls */}
         <View style={styles.routeInputContainer}>
           <TextInput
             style={styles.routeInput}
@@ -549,7 +552,7 @@ const MapScreen: React.FC = () => {
             disabled={isAnalyzing}
           >
             <Text style={styles.routeButtonText}>
-              {isAnalyzing ? 'Analyzing...' : 'Analyze Route'}
+              {isAnalyzing ? 'Analyzing...' : 'GO'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -559,64 +562,47 @@ const MapScreen: React.FC = () => {
             <Text style={styles.clearButtonText}>Clear Route</Text>
           </TouchableOpacity>
         )}
-      </View>
 
-      {/* Route Analysis Results */}
-      {showRouteAnalysis && routeAnalysis && (
-        <View style={styles.routeAnalysisContainer}>
-          <View style={styles.routeAnalysisHeader}>
-            <Text style={styles.routeAnalysisTitle}>Route Safety Analysis</Text>
-            <TouchableOpacity onPress={() => setShowRouteAnalysis(false)}>
-              <Ionicons name="close" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.safetyLevelContainer}>
-            <Text style={styles.safetyLevelLabel}>Safety Level:</Text>
-            <Text style={[styles.safetyLevelValue, { color: getSafetyColor(routeAnalysis.safetyLevel) }]}>
-              {routeAnalysis.safetyLevel}
-            </Text>
-          </View>
-          
-          <Text style={styles.analysisText}>{routeAnalysis.analysis}</Text>
-          
-          <Text style={styles.nearbyTheftsText}>
-            Nearby theft reports: {routeAnalysis.nearbyThefts}
-          </Text>
-          
-          {routeAnalysis.safeAlternatives.length > 0 && (
-            <View style={styles.alternativesSection}>
-              <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
-              {routeAnalysis.safeAlternatives.slice(0, 3).map((alt, index) => (
-                <TouchableOpacity 
-                  key={index} 
-                  style={styles.alternativeItem}
-                  onPress={() => handleSafeAlternativePress(alt)}
-                >
-                  <Text style={styles.alternativeName}>{alt.name}</Text>
-                  <Text style={styles.alternativeScore}>Safety: {alt.safetyScore}/10</Text>
-                </TouchableOpacity>
-              ))}
+        {/* Route Analysis Results */}
+        {showRouteAnalysis && routeAnalysis && (
+          <View style={styles.routeAnalysisResults}>
+            <View style={styles.routeAnalysisHeader}>
+              <Text style={styles.routeAnalysisTitle}>Route Safety Analysis</Text>
+              <TouchableOpacity onPress={() => setShowRouteAnalysis(false)}>
+                <Ionicons name="close" size={24} color="white" />
+              </TouchableOpacity>
             </View>
-          )}
-        </View>
-      )}
-
-      {/* Search bar at bottom */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Text style={styles.searchIcon}>🔍</Text>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search Maps"
-            placeholderTextColor="#989FAB"
-          />
-          <Text style={styles.micIcon}>🎤</Text>
-        </View>
-        <View style={styles.profileContainer}>
-          <View style={styles.profileIcon} />
-        </View>
-        <View style={styles.searchHandle} />
+            
+            <View style={styles.safetyLevelContainer}>
+              <Text style={styles.safetyLevelLabel}>Safety Level:</Text>
+              <Text style={[styles.safetyLevelValue, { color: getSafetyColor(routeAnalysis.safetyLevel) }]}>
+                {routeAnalysis.safetyLevel}
+              </Text>
+            </View>
+            
+            <Text style={styles.analysisText}>{routeAnalysis.analysis}</Text>
+            
+            <Text style={styles.nearbyTheftsText}>
+              Nearby theft reports: {routeAnalysis.nearbyThefts}
+            </Text>
+            
+            {routeAnalysis.safeAlternatives.length > 0 && (
+              <View style={styles.alternativesSection}>
+                <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
+                {routeAnalysis.safeAlternatives.slice(0, 3).map((alt, index) => (
+                  <TouchableOpacity 
+                    key={index} 
+                    style={styles.alternativeItem}
+                    onPress={() => handleSafeAlternativePress(alt)}
+                  >
+                    <Text style={styles.alternativeName}>{alt.name}</Text>
+                    <Text style={styles.alternativeScore}>Safety: {alt.safetyScore}/10</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
       </View>
 
       {/* Report details modal - Citizen app style */}
@@ -806,9 +792,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#1C1C1E',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    paddingTop: 8,
     paddingBottom: 34,
     paddingHorizontal: 16,
+    maxHeight: height * 0.7,
   },
   searchHandle: {
     width: 36,
@@ -817,6 +803,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     alignSelf: 'center',
     marginBottom: 16,
+    marginTop: 8,
   },
   searchBar: {
     flexDirection: 'row',
@@ -840,17 +827,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginLeft: 8,
   },
-  profileContainer: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-  },
-  profileIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#48484A',
-  },
+
   // Modal styles - Citizen app inspired
   detailsModal: {
     position: 'absolute',
@@ -978,6 +955,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  statusValueRed: {
+    color: '#FF3B30',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Bottom sheet route analysis styles
+  bottomSheetContent: {
+    maxHeight: 300,
+  },
+  loadingContainer: {
+    paddingBottom: 16,
+  },
+  loadingIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  loadingEmoji: {
+    fontSize: 24,
+  },
+  loadingDetails: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  loadingText: {
+    color: '#8E8E93',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  routeIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#30D158',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  routeEmoji: {
+    fontSize: 24,
+  },
+  resultsScroll: {
+    maxHeight: 280,
+  },
+  analysisContent: {
+    padding: 20,
+  },
+  routeButtonDisabled: {
+    backgroundColor: '#48484A',
+    opacity: 0.6,
+  },
   fullReportSection: {
     borderTopWidth: 1,
     borderTopColor: '#2C2C2E',
@@ -996,37 +1029,33 @@ const styles = StyleSheet.create({
   },
   
   // Route planning styles
-  routeControls: {
-    position: 'absolute',
-    top: 120,
-    left: 20,
-    right: 20,
-    zIndex: 10,
-  },
   routeInputContainer: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom: 16,
+    paddingHorizontal: 0,
   },
   routeInput: {
     flex: 1,
-    backgroundColor: 'rgba(28, 28, 30, 0.9)',
+    backgroundColor: '#2C2C2E',
     color: 'white',
     padding: 12,
     borderRadius: 8,
-    marginRight: 10,
+    marginRight: 12,
     fontSize: 16,
   },
   routeButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     borderRadius: 8,
     justifyContent: 'center',
+    minWidth: 60,
   },
   routeButtonText: {
     color: 'white',
     fontWeight: '600',
     fontSize: 14,
+    textAlign: 'center',
   },
   clearButton: {
     backgroundColor: 'rgba(255, 59, 48, 0.9)',
@@ -1042,16 +1071,12 @@ const styles = StyleSheet.create({
   },
   
   // Route analysis styles
-  routeAnalysisContainer: {
-    position: 'absolute',
-    top: 200,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(28, 28, 30, 0.95)',
+  routeAnalysisResults: {
+    backgroundColor: 'rgba(44, 44, 46, 0.95)',
     borderRadius: 12,
     padding: 16,
-    maxHeight: height * 0.4,
-    zIndex: 10,
+    marginBottom: 16,
+    maxHeight: height * 0.3,
   },
   routeAnalysisHeader: {
     flexDirection: 'row',
@@ -1118,6 +1143,131 @@ const styles = StyleSheet.create({
     color: '#30D158',
     fontSize: 12,
     marginTop: 2,
+  },
+  
+  // Markdown styles
+  markdownH2: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  markdownH3: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  markdownBold: {
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  markdownParagraph: {
+    color: '#E5E5E7',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  markdownBulletContainer: {
+    flexDirection: 'row',
+    marginBottom: 4,
+    paddingLeft: 8,
+  },
+  markdownBullet: {
+    color: '#30D158',
+    fontSize: 14,
+    marginRight: 8,
+    fontWeight: 'bold',
+  },
+  markdownNumber: {
+    color: '#30D158',
+    fontSize: 14,
+    marginRight: 8,
+    fontWeight: 'bold',
+    minWidth: 20,
+  },
+  markdownBulletText: {
+    color: '#E5E5E7',
+    fontSize: 14,
+    lineHeight: 20,
+    flex: 1,
+  },
+  
+  // Enhanced route analysis styles
+  safetyBadgeContainer: {
+    marginBottom: 16,
+  },
+  safetyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  safetyBadgeIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  safetyBadgeText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  analysisContainer: {
+    marginBottom: 16,
+  },
+  theftSummaryContainer: {
+    backgroundColor: 'rgba(255, 149, 0, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderLeftWidth: 3,
+    borderLeftColor: '#FF9500',
+  },
+  theftSummaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  theftSummaryIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  theftSummaryTitle: {
+    color: '#FF9500',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  theftSummaryText: {
+    color: '#E5E5E7',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  alternativesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  alternativesIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  alternativeContent: {
+    flex: 1,
+  },
+  alternativeScoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  alternativeScoreLabel: {
+    color: '#8E8E93',
+    fontSize: 12,
+    marginRight: 4,
   },
 });
 
