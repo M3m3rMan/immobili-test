@@ -862,6 +862,10 @@ const getSafetyColor = (safetyLevel: string) => {
         onPress={() => {
           // Dismiss keyboard when tapping on map
           Keyboard.dismiss();
+          // Dismiss bottom panel if it's showing
+          if (showDetails) {
+            handleCloseDetails();
+          }
         }}
       >
         {/* Test marker to verify markers are working */}
