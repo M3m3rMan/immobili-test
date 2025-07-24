@@ -1,0 +1,7 @@
+<svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Yellow triangle background -->
+  <path d="M15 3L27 24H3L15 3Z" fill="#FACC14" stroke="#F59E0B" stroke-width="2"/>
+  <!-- Exclamation mark -->
+  <path d="M15 10V17" stroke="#1F2937" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="15" cy="20" r="1.5" fill="#1F2937"/>
+</svg>

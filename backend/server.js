@@ -146,9 +146,10 @@ function extractScooterReports(text) {
     }
   });
 
-  // If no reports found, create sample data for demo
+  // If no reports found, create sample data for demo with better red/yellow balance
   if (reports.length === 0) {
     const sampleReports = [
+      // RED MARKERS (Completed thefts - investigation worthy)
       {
         raw: "E-scooter theft reported at USC Village. Black scooter taken from bike rack.",
         location: "USC Village",
@@ -168,6 +169,44 @@ function extractScooterReports(text) {
         processed: false
       },
       {
+        raw: "Red electric scooter theft reported near USC North area. Lock was cut.",
+        location: "USC North",
+        latitude: 34.0260,
+        longitude: -118.2830,
+        title: "Red E-Scooter Theft",
+        description: "Lock was cut, scooter stolen",
+        processed: false
+      },
+      {
+        raw: "Blue scooter stolen from USC South parking area during evening hours.",
+        location: "USC South",
+        latitude: 34.0180,
+        longitude: -118.2880,
+        title: "Blue Scooter Theft",
+        description: "Stolen during evening hours",
+        processed: false
+      },
+      {
+        raw: "E-scooter theft incident at USC East. Scooter was secured but lock was broken.",
+        location: "USC East",
+        latitude: 34.0230,
+        longitude: -118.2810,
+        title: "E-Scooter Theft - Lock Broken",
+        description: "Secured scooter, lock was broken",
+        processed: false
+      },
+      {
+        raw: "White electric scooter reported stolen from USC West area near dormitories.",
+        location: "USC West",
+        latitude: 34.0200,
+        longitude: -118.2920,
+        title: "White E-Scooter Theft",
+        description: "Stolen near dormitories",
+        processed: false
+      },
+      
+      // YELLOW MARKERS (Attempted/prevented thefts - non-investigation)
+      {
         raw: "Attempted theft of e-scooter near USC Campus. Suspect fled when confronted.",
         location: "USC Campus",
         latitude: 34.0224,
@@ -175,36 +214,80 @@ function extractScooterReports(text) {
         title: "Attempted E-Scooter Theft",
         description: "Suspect fled when confronted",
         processed: false
+      },
+      {
+        raw: "Scooter theft attempt foiled by security at USC Central area.",
+        location: "USC Central",
+        latitude: 34.0245,
+        longitude: -118.2865,
+        title: "Theft Attempt Foiled",
+        description: "Security prevented theft",
+        processed: false
+      },
+      {
+        raw: "Suspicious person seen near scooters at USC Library. No theft occurred, person left when approached.",
+        location: "USC Library",
+        latitude: 34.0205,
+        longitude: -118.2840,
+        title: "Suspicious Activity - No Theft",
+        description: "Person left when approached, no crime",
+        processed: false
+      },
+      {
+        raw: "Report of someone tampering with scooter lock near Doheny Library. Scooter owner returned, no theft.",
+        location: "Doheny Library",
+        latitude: 34.0195,
+        longitude: -118.2835,
+        title: "Lock Tampering - No Theft",
+        description: "Owner returned, scooter safe",
+        processed: false
+      },
+      {
+        raw: "Attempted scooter theft interrupted by passerby. Suspect fled immediately, no damage to scooter.",
+        location: "USC Village Gateway",
+        latitude: 34.0248,
+        longitude: -118.2825,
+        title: "Interrupted Attempt - No Damage",
+        description: "Passerby intervention, scooter safe",
+        processed: false
+      },
+      {
+        raw: "Scooter alarm activated but turned out to be accidental bump by pedestrian.",
+        location: "USC Bookstore",
+        latitude: 34.0220,
+        longitude: -118.2860,
+        title: "False Alarm - Accidental Bump",
+        description: "Pedestrian accidentally triggered alarm",
+        processed: false
+      },
+      {
+        raw: "Attempted theft deterred by security camera. Suspect noticed camera and left immediately.",
+        location: "USC Marshall",
+        latitude: 34.0185,
+        longitude: -118.2825,
+        title: "Camera Deterrent - No Theft",
+        description: "Security camera prevented theft",
+        processed: false
+      },
+      {
+        raw: "Report of suspicious activity near scooters. Investigation revealed person was just checking tire pressure.",
+        location: "USC Parking Structure",
+        latitude: 34.0235,
+        longitude: -118.2875,
+        title: "Suspicious Activity - Tire Check",
+        description: "Person checking tire pressure",
+        processed: false
+      },
+      {
+        raw: "Scooter moved without permission but returned within hour. No theft charges filed.",
+        location: "USC Engineering",
+        latitude: 34.0190,
+        longitude: -118.2890,
+        title: "Unauthorized Move - Returned",
+        description: "Returned quickly, no charges",
+        processed: false
       }
     ];
-    
-    // Generate additional sample reports to reach 15 total
-    const additionalLocations = [
-      { name: "USC North", lat: 34.0260, lng: -118.2830 },
-      { name: "USC South", lat: 34.0180, lng: -118.2880 },
-      { name: "USC East", lat: 34.0230, lng: -118.2810 },
-      { name: "USC West", lat: 34.0200, lng: -118.2920 },
-      { name: "USC Central", lat: 34.0245, lng: -118.2865 },
-      { name: "USC Perimeter", lat: 34.0215, lng: -118.2845 },
-      { name: "USC Neighborhood", lat: 34.0235, lng: -118.2875 },
-      { name: "USC District", lat: 34.0205, lng: -118.2835 },
-      { name: "USC Zone", lat: 34.0255, lng: -118.2855 },
-      { name: "Downtown USC", lat: 34.0240, lng: -118.2790 },
-      { name: "USC Area", lat: 34.0210, lng: -118.2870 },
-      { name: "USC Vicinity", lat: 34.0199, lng: -118.2899 }
-    ];
-    
-    additionalLocations.forEach((loc, index) => {
-      sampleReports.push({
-        raw: `E-scooter theft incident reported at ${loc.name}. Scooter was secured but lock was cut.`,
-        location: loc.name,
-        latitude: loc.lat + (Math.random() - 0.5) * 0.002, // Small random offset
-        longitude: loc.lng + (Math.random() - 0.5) * 0.002,
-        title: "E-Scooter Theft Reported",
-        description: `Theft incident at ${loc.name}`,
-        processed: false
-      });
-    });
     
     reports.push(...sampleReports);
   }
@@ -399,8 +482,8 @@ function determineSafetyLevel(theftCount) {
 // Helper function to generate safe parking alternatives
 function generateSafeAlternatives(destLat, destLng, allReports) {
   const alternatives = [];
-  const searchRadius = 0.3; // 300m radius
-  const gridSize = 0.002; // ~200m grid spacing
+  const searchRadius = 0.2; // Reduce from 0.3 to 0.2 (200m instead of 300m)
+  const gridSize = 0.004; // Increase spacing (fewer points)
   
   // Generate potential parking spots in a grid around destination
   for (let latOffset = -searchRadius; latOffset <= searchRadius; latOffset += gridSize) {
@@ -418,8 +501,8 @@ function generateSafeAlternatives(destLat, destLng, allReports) {
         return distance <= 0.2; // Within 200m
       }).length;
       
-      // Only suggest locations with fewer thefts
-      if (nearbyThefts <= 1) {
+      // Only suggest locations with NO thefts (stricter)
+      if (nearbyThefts === 0) {
         alternatives.push({
           latitude: candidateLat,
           longitude: candidateLng,
@@ -432,10 +515,10 @@ function generateSafeAlternatives(destLat, destLng, allReports) {
     }
   }
   
-  // Sort by safety score and distance, return top 5
+  // Return only top 2-3 instead of 5
   return alternatives
     .sort((a, b) => b.safetyScore - a.safetyScore || a.distanceFromDestination - b.distanceFromDestination)
-    .slice(0, 5);
+    .slice(0, 2); // Reduced from 5 to 2
 }
 
 app.post('/api/login', express.json(), async (req, res) => {

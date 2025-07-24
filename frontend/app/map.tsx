@@ -29,7 +29,7 @@ interface SafetyZone {
   name: string;
   latitude: number;
   longitude: number;
-  type: 'security' | 'parking';
+  type: 'security' | 'parking' | 'emergency' | 'patrol';
   description: string;
 }
 
@@ -58,29 +58,186 @@ interface Destination {
 
 const GOOGLE_MAPS_APIKEY = 'AIzaSyASv3U2e0Td2KUAjvnBii1Oj2CcxLCZdhc'; // Replace with your API key
 
-// USC coordinates
+// USC coordinates with better zoom for showing theft reports
 const USC_COORDINATES = {
   latitude: 34.0224,
   longitude: -118.2851,
-  latitudeDelta: 0.01,
-  longitudeDelta: 0.01,
+  latitudeDelta: 0.008, // Reduced for closer zoom
+  longitudeDelta: 0.008, // Reduced for closer zoom
 };
 
 // Safety zones for secure scooter parking
 const SAFETY_ZONES: SafetyZone[] = [
+  // Main Security Facilities
   {
     id: 'usc-security',
     name: 'USC Department of Public Safety',
-    latitude: 34.0224,
-    longitude: -118.2851,
+    latitude: 34.02107152583869,
+    longitude: -118.29017304423343,
     type: 'security',
     description: 'USC Department of Public Safety - 24/7 monitored area with security presence. Safe zone for scooter parking.',
   },
+  
+  // Libraries with 24/7 Security and Access
+  {
+    id: 'leavey-library',
+    name: 'Leavey Library (24/7 Security)',
+    latitude: 34.0205,
+    longitude: -118.2830,
+    type: 'security',
+    description: 'Thomas and Dorothy Leavey Library - 24/7 access with security presence and emergency assistance available.',
+  },
+  {
+    id: 'doheny-library',
+    name: 'Doheny Memorial Library',
+    latitude: 34.0200,
+    longitude: -118.2870,
+    type: 'security',
+    description: 'Historic Doheny Memorial Library - Central campus location with security monitoring and emergency phones.',
+  },
+  
+  // Emergency Blue Light Phones (strategically placed around campus)
+  {
+    id: 'emergency-trousdale',
+    name: 'Emergency Call Box - Trousdale',
+    latitude: 34.0200,
+    longitude: -118.2890,
+    type: 'emergency',
+    description: 'Blue light emergency phone with direct line to DPS. Push red button for immediate assistance.',
+  },
+  {
+    id: 'emergency-figueroa',
+    name: 'Emergency Call Box - Figueroa Gate',
+    latitude: 34.0190,
+    longitude: -118.2820,
+    type: 'emergency',
+    description: 'Emergency call box near main campus entrance. Direct connection to USC Department of Public Safety.',
+  },
+  {
+    id: 'emergency-alumni',
+    name: 'Emergency Call Box - Alumni Park',
+    latitude: 34.0210,
+    longitude: -118.2875,
+    type: 'emergency',
+    description: 'Blue light emergency phone in Alumni Park area. Available 24/7 for emergency assistance.',
+  },
+  {
+    id: 'emergency-mccarthy',
+    name: 'Emergency Call Box - McCarthy Way',
+    latitude: 34.0220,
+    longitude: -118.2825,
+    type: 'emergency',
+    description: 'Emergency phone near 24-hour campus entrance. Immediate connection to security dispatch.',
+  },
+  {
+    id: 'emergency-exposition',
+    name: 'Emergency Call Box - Exposition Blvd',
+    latitude: 34.0180,
+    longitude: -118.2860,
+    type: 'emergency',
+    description: 'Emergency call box on campus perimeter. Direct line to DPS for immediate response.',
+  },
+  {
+    id: 'emergency-parking',
+    name: 'Emergency Call Box - Parking Structure',
+    latitude: 34.0215,
+    longitude: -118.2840,
+    type: 'emergency',
+    description: 'Blue light phone in parking structure. Security cameras and emergency response available.',
+  },
+  {
+    id: 'emergency-science',
+    name: 'Emergency Call Box - Science Center',
+    latitude: 34.0195,
+    longitude: -118.2845,
+    type: 'emergency',
+    description: 'Emergency phone near Science Center. Well-lit area with regular security patrols.',
+  },
+  {
+    id: 'emergency-engineering',
+    name: 'Emergency Call Box - Engineering Quad',
+    latitude: 34.0225,
+    longitude: -118.2890,
+    type: 'emergency',
+    description: 'Blue light emergency phone in Engineering Quad. 24/7 monitoring and response.',
+  },
+  
+  // Campus Buildings with Security Presence
+  {
+    id: 'student-union',
+    name: 'Student Union Building',
+    latitude: 34.0195,
+    longitude: -118.2885,
+    type: 'security',
+    description: 'Student Union with security presence and high foot traffic. Safe area for parking and activities.',
+  },
+  {
+    id: 'bovard-auditorium',
+    name: 'Bovard Auditorium Area',
+    latitude: 34.0205,
+    longitude: -118.2875,
+    type: 'security',
+    description: 'Central campus location near Bovard Auditorium. Well-monitored area with regular security presence.',
+  },
+  {
+    id: 'usc-village',
+    name: 'USC Village (Residential Security)',
+    latitude: 34.0250,
+    longitude: -118.2900,
+    type: 'security',
+    description: 'USC Village residential area with 24/7 security officers, biometric access, and surveillance cameras.',
+  },
+  
+  // Security Patrol Zones (Yellow Jacket Areas)
+  {
+    id: 'patrol-28th',
+    name: 'Yellow Jacket Patrol - 28th Street',
+    latitude: 34.0170,
+    longitude: -118.2840,
+    type: 'patrol',
+    description: 'Security ambassador patrol zone. Yellow jacket officers provide visible security presence.',
+  },
+  {
+    id: 'patrol-jefferson',
+    name: 'Yellow Jacket Patrol - Jefferson Blvd',
+    latitude: 34.0160,
+    longitude: -118.2880,
+    type: 'patrol',
+    description: 'Active patrol zone with security ambassadors in bright yellow jackets for easy identification.',
+  },
+  {
+    id: 'patrol-figueroa',
+    name: 'Yellow Jacket Patrol - Figueroa Corridor',
+    latitude: 34.0185,
+    longitude: -118.2810,
+    type: 'patrol',
+    description: 'High-visibility security patrol area along Figueroa Street corridor.',
+  },
+  
+  // Campus Entrances with Security
+  {
+    id: 'main-gate',
+    name: 'Main Campus Gate Security',
+    latitude: 34.0195,
+    longitude: -118.2815,
+    type: 'security',
+    description: 'Main campus entrance with security checkpoint and monitoring. Safe entry/exit point.',
+  },
+  {
+    id: 'watt-gate',
+    name: 'Watt Way Gate Security',
+    latitude: 34.0230,
+    longitude: -118.2870,
+    type: 'security',
+    description: 'Watt Way entrance with security presence and access control monitoring.',
+  },
+  
+  // Original Caruso Center
   {
     id: 'caruso-center',
     name: 'Our Savior Parish & USC Caruso Catholic Center',
-    latitude: 34.0198,
-    longitude: -118.2889,
+    latitude: 34.0250846,
+    longitude: -118.2834442,
     type: 'parking',
     description: 'Our Savior Parish & USC Caruso Catholic Center - Well-lit area with regular foot traffic. Recommended safe parking zone.',
   },
@@ -94,11 +251,11 @@ const SAMPLE_REPORTS: TheftReport[] = [
     location: 'USC Village',
     latitude: 34.0251,
     longitude: -118.2831,
-    title: 'Stolen E-scooter Reported, Bird scooter theft near library',
+    title: 'Attempted E-scooter Theft',
     description: 'Suspect fled when approached',
     date: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
   },
-    {
+  {
     _id: '2',
     raw: 'Electric scooter stolen from Exposition Park area. Victim reported scooter missing from parking area.',
     location: 'Exposition Park',
@@ -167,8 +324,68 @@ const SAMPLE_REPORTS: TheftReport[] = [
     title: 'Theft Attempt Foiled',
     description: 'Security prevented theft',
     date: new Date(Date.now() - 691200000).toISOString(), // 8 days ago
+  },
+  // Yellow markers - suspects got away, no investigation
+  {
+    _id: '9',
+    raw: 'Scooter theft reported near USC Library. Suspect escaped on foot, no witnesses available for identification.',
+    location: 'USC Library',
+    latitude: 34.0215,
+    longitude: -118.2835,
+    title: 'Scooter Theft - Suspect Escaped',
+    description: 'No witnesses, suspect got away',
+    date: new Date(Date.now() - 777600000).toISOString(), // 9 days ago
+  },
+  {
+    _id: '10',
+    raw: 'Electric scooter stolen from USC parking structure. Security cameras malfunctioned, no leads.',
+    location: 'USC Parking',
+    latitude: 34.0240,
+    longitude: -118.2840,
+    title: 'E-Scooter Theft - No Leads',
+    description: 'Camera malfunction, no investigation',
+    date: new Date(Date.now() - 864000000).toISOString(), // 10 days ago
+  },
+  {
+    _id: '11',
+    raw: 'Attempted scooter theft near USC Student Union. Suspect fled before security arrived, case closed.',
+    location: 'USC Student Union',
+    latitude: 34.0205,
+    longitude: -118.2870,
+    title: 'Attempted Theft - Case Closed',
+    description: 'Suspect fled, insufficient evidence',
+    date: new Date(Date.now() - 950400000).toISOString(), // 11 days ago
+  },
+  {
+    _id: '12',
+    raw: 'Scooter theft reported at USC Village Gate. Victim could not provide description, no investigation pursued.',
+    location: 'USC Village Gate',
+    latitude: 34.0255,
+    longitude: -118.2825,
+    title: 'Theft Report - No Description',
+    description: 'Insufficient details for investigation',
+    date: new Date(Date.now() - 1036800000).toISOString(), // 12 days ago
+  },
+  {
+    _id: '13',
+    raw: 'Electric scooter missing from USC Recreation Center area. Reported as theft but suspect unknown.',
+    location: 'USC Recreation',
+    latitude: 34.0195,
+    longitude: -118.2845,
+    title: 'Missing E-Scooter',
+    description: 'Theft suspected, no suspect identified',
+    date: new Date(Date.now() - 1123200000).toISOString(), // 13 days ago
+  },
+  {
+    _id: '14',
+    raw: 'Scooter theft attempt near USC Bookstore. Suspect escaped when student approached, no follow-up.',
+    location: 'USC Bookstore',
+    latitude: 34.0210,
+    longitude: -118.2855,
+    title: 'Theft Attempt - No Follow-up',
+    description: 'Suspect escaped, case not pursued',
+    date: new Date(Date.now() - 1209600000).toISOString(), // 14 days ago
   }
-  
 ];
 
 const MapScreen: React.FC = () => {
@@ -197,12 +414,14 @@ const MapScreen: React.FC = () => {
   const searchContainerAnim = useRef(new Animated.Value(0)).current;
 
   // Helper function to get marker icons
-  const getMarkerIcon = (type: 'danger' | 'warning' | 'safety' | 'alternative' | 'destination') => {
+  const getMarkerIcon = (type: 'danger' | 'warning' | 'warning-alt' | 'safety' | 'alternative' | 'destination') => {
     switch (type) {
       case 'danger':
         return require('../assets/images/map/red_error.png');
       case 'warning':
         return require('../assets/images/map/yellow_error.png');
+      case 'warning-alt':
+        return require('../assets/images/map/red_error2.png'); // Different red icon for variety
       case 'safety':
         return require('../assets/images/map/Ellipse 15.png');
       case 'alternative':
@@ -215,18 +434,35 @@ const MapScreen: React.FC = () => {
     }
   };
 
+  // Debug logging
+  console.log('MapScreen render - Reports count:', reports.length, 'Safety zones:', safetyZones.length);
+
   // Helper function to determine report severity
   const getReportSeverity = (report: TheftReport) => {
     const title = report.title.toLowerCase();
     const description = report.description.toLowerCase();
     const raw = report.raw.toLowerCase();
     
+    // Yellow markers: attempted thefts, suspects who got away, no investigation cases
     if (title.includes('attempted') || description.includes('attempted') || raw.includes('attempted') ||
         title.includes('foiled') || description.includes('foiled') || raw.includes('foiled') ||
-        title.includes('prevented') || description.includes('prevented') || raw.includes('prevented')) {
+        title.includes('prevented') || description.includes('prevented') || raw.includes('prevented') ||
+        title.includes('escaped') || description.includes('escaped') || raw.includes('escaped') ||
+        title.includes('got away') || description.includes('got away') || raw.includes('got away') ||
+        title.includes('fled') || description.includes('fled') || raw.includes('fled') ||
+        title.includes('no leads') || description.includes('no leads') || raw.includes('no leads') ||
+        title.includes('no investigation') || description.includes('no investigation') || raw.includes('no investigation') ||
+        title.includes('case closed') || description.includes('case closed') || raw.includes('case closed') ||
+        title.includes('no follow-up') || description.includes('no follow-up') || raw.includes('no follow-up') ||
+        title.includes('insufficient') || description.includes('insufficient') || raw.includes('insufficient') ||
+        title.includes('no witnesses') || description.includes('no witnesses') || raw.includes('no witnesses') ||
+        title.includes('no description') || description.includes('no description') || raw.includes('no description') ||
+        title.includes('suspect unknown') || description.includes('suspect unknown') || raw.includes('suspect unknown') ||
+        title.includes('missing') || description.includes('missing') || raw.includes('missing')) {
       return 'attempted';
     }
     
+    // Red markers: completed thefts with evidence/investigation
     return 'completed';
   };
 
@@ -234,8 +470,7 @@ const MapScreen: React.FC = () => {
     // Request location permissions and get current location
     const getLocationPermission = async () => {
       // Skip location services on web to avoid ExpoLocation native module error
-      if (Platform.OS === 'web' || !Location) {
-        console.log('Location services not available on web, using default USC coordinates');
+      if (Platform.OS === 'web') {
         setUserLocation(USC_COORDINATES);
         return;
       }
@@ -265,23 +500,32 @@ const MapScreen: React.FC = () => {
 
     getLocationPermission();
 
-    // Fetch reports from backend - get 20 danger zones
+    // Fetch reports from backend - with immediate fallback
     const fetchReports = async () => {
+      // First, ensure we always have sample data visible
+      console.log('Setting initial sample reports...', SAMPLE_REPORTS.length, 'reports');
+      setReports(SAMPLE_REPORTS);
+      
       try {
         console.log('Fetching reports from backend...');
-        const res = await fetch('http://192.168.1.139:3001/api/scooter-reports');
+        const res = await fetch('http://192.168.1.101:3001/api/scooter-reports');
         const data = await res.json();
+        console.log('Backend response:', data);
+        
         if (data.reports && data.reports.length > 0) {
-          // Get 20 reports for danger zones
-          const dangerZones = data.reports.slice(0, 20);
-          setReports(dangerZones);
-          console.log(`Loaded ${dangerZones.length} danger zones from backend`);
+          // Combine backend reports with sample data to ensure we always have visible markers
+          const combinedReports = [...SAMPLE_REPORTS, ...data.reports];
+          setReports(combinedReports);
+          console.log(`Loaded ${data.reports.length} reports from backend, total: ${combinedReports.length}`);
         } else {
-          console.log('No reports from backend, using sample data');
+          console.log('No reports from backend, keeping sample data');
+          // Ensure sample data is set again
           setReports(SAMPLE_REPORTS);
         }
       } catch (error) {
         console.error('Error fetching reports:', error);
+        console.log('Using sample data due to backend error');
+        // Ensure sample data is set again
         setReports(SAMPLE_REPORTS);
       }
     };
@@ -382,30 +626,69 @@ const MapScreen: React.FC = () => {
       return;
     }
 
-    // For demo, we'll use a fixed coordinate near USC
-    // In a real app, you'd use geocoding to convert address to coordinates
-    const demoDestination: Destination = {
-      latitude: 34.0199 + (Math.random() - 0.5) * 0.01,
-      longitude: -118.2899 + (Math.random() - 0.5) * 0.01,
-      name: destinationInput
-    };
-
-    setDestination(demoDestination);
-    setShowDirections(true);
+    setIsAnalyzing(true);
     
-    // Analyze the route
-    await analyzeRoute(demoDestination);
+    try {
+      // Use Google Places API to get accurate coordinates
+      const destination = await geocodeAddress(destinationInput);
+      
+      if (!destination) {
+        Alert.alert('Error', 'Could not find the specified location. Please try a different address.');
+        setIsAnalyzing(false);
+        return;
+      }
+
+      console.log(`Found destination: ${destination.name} at (${destination.latitude}, ${destination.longitude})`);
+      
+      setDestination(destination);
+      setShowDirections(true);
+      
+      // Analyze the route with accurate coordinates
+      await analyzeRoute(destination);
+    } catch (error) {
+      console.error('Error setting destination:', error);
+      Alert.alert('Error', 'Failed to set destination. Please try again.');
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Add this function to use Google Places API for geocoding
+  const geocodeAddress = async (address: string): Promise<Destination | null> => {
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
+      );
+      
+      const data = await response.json();
+      
+      if (data.status === 'OK' && data.results.length > 0) {
+        const result = data.results[0];
+        const location = result.geometry.location;
+        
+        return {
+          latitude: location.lat,
+          longitude: location.lng,
+          name: result.formatted_address
+        };
+      } else {
+        console.error('Geocoding failed:', data.status);
+        return null;
+      }
+    } catch (error) {
+      console.error('Geocoding error:', error);
+      return null;
+    }
   };
 
   const analyzeRoute = async (dest: Destination) => {
     if (!userLocation) {
       Alert.alert('Error', 'User location not available');
+      setIsAnalyzing(false);
       return;
     }
 
-    setIsAnalyzing(true);
     try {
-      const response = await fetch('http://192.168.1.139:3001/api/analyze-route', {
+      const response = await fetch('http://192.168.1.101:3001/api/analyze-route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -442,6 +725,7 @@ const MapScreen: React.FC = () => {
     setSafeAlternatives([]);
     setShowRouteAnalysis(false);
     setDestinationInput('');
+    setIsAnalyzing(false);
   };
 
   // MarkdownText component for rendering formatted text
@@ -548,6 +832,10 @@ const getSafetyColor = (safetyLevel: string) => {
           <Text style={styles.backArrow}>←</Text>
         </Pressable>
         <View style={styles.headerContent}>
+          {/* Debug info - remove this later */}
+          <Text style={{color: 'white', fontSize: 12}}>
+            Reports: {reports.length} | Safety: {safetyZones.length}
+          </Text>
         </View>
       </View>
 
@@ -576,6 +864,17 @@ const getSafetyColor = (safetyLevel: string) => {
           Keyboard.dismiss();
         }}
       >
+        {/* Test marker to verify markers are working */}
+        <Marker
+          key="test-marker"
+          coordinate={{
+            latitude: 34.0224,
+            longitude: -118.2851,
+          }}
+          pinColor="purple"
+          title="TEST MARKER - If you see this, markers work!"
+        />
+
         {/* Custom warning markers for danger zones (theft reports) */}
         {reports.map((report, index) => {
           // Ensure we have valid coordinates before rendering
@@ -587,9 +886,18 @@ const getSafetyColor = (safetyLevel: string) => {
           
           // Determine marker type based on report severity
           const severity = getReportSeverity(report);
-          const markerType = severity === 'attempted' ? 'warning' : 'danger';
+          let markerType: 'danger' | 'warning' | 'warning-alt' = severity === 'attempted' ? 'warning' : 'danger';
           
-          console.log(`Rendering ${markerType} zone ${index} at:`, report.latitude, report.longitude);
+          // Add variety to warning markers - use alternate warning icon for some markers
+          if (markerType === 'warning' && index % 3 === 0) {
+            markerType = 'warning-alt';
+          }
+          
+          // Determine fallback pin color
+          const fallbackColor = markerType === 'danger' ? 'red' : 
+                               markerType === 'warning-alt' ? 'red' : 'orange';
+          
+          console.log(`Rendering ${markerType} zone ${index} at:`, report.latitude, report.longitude, 'title:', report.title);
           return (
             <Marker
               key={`${markerType}-${report._id || `sample-${index}`}`}
@@ -599,6 +907,9 @@ const getSafetyColor = (safetyLevel: string) => {
               }}
               onPress={() => handleMarkerPress(report)}
               image={getMarkerIcon(markerType)}
+              pinColor={fallbackColor} // Fallback if no custom image
+              anchor={{ x: 0.5, y: 1 }} // Ensure proper positioning
+              centerOffset={{ x: 0, y: -20 }} // Offset for better visibility
             />
           );
         })}
