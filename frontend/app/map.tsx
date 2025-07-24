@@ -904,7 +904,7 @@ const getSafetyColor = (safetyLevel: string) => {
           console.log(`Rendering ${markerType} zone ${index} at:`, report.latitude, report.longitude, 'title:', report.title);
           return (
             <Marker
-              key={`${markerType}-${report._id || `sample-${index}`}`}
+              key={`report-${report._id || `sample-${index}`}`}
               coordinate={{
                 latitude: Number(report.latitude),
                 longitude: Number(report.longitude),
@@ -914,6 +914,7 @@ const getSafetyColor = (safetyLevel: string) => {
               pinColor={fallbackColor} // Fallback if no custom image
               anchor={{ x: 0.5, y: 1 }} // Ensure proper positioning
               centerOffset={{ x: 0, y: -20 }} // Offset for better visibility
+              tracksViewChanges={false} // Prevent unnecessary re-renders
             />
           );
         })}
@@ -931,6 +932,7 @@ const getSafetyColor = (safetyLevel: string) => {
               onPress={() => handleSafetyZonePress(zone)}
               image={getMarkerIcon('safety')}
               pinColor="green" // Fallback if no custom image
+              tracksViewChanges={false} // Prevent unnecessary re-renders
             />
           );
         })}
@@ -938,7 +940,7 @@ const getSafetyColor = (safetyLevel: string) => {
         {/* Green markers for safe alternatives */}
         {safeAlternatives.map((alternative, index) => (
           <Marker
-            key={`alternative-${index}`}
+            key={`alternative-${alternative.name}-${index}`}
             coordinate={{
               latitude: alternative.latitude,
               longitude: alternative.longitude,
@@ -946,6 +948,7 @@ const getSafetyColor = (safetyLevel: string) => {
             onPress={() => handleSafeAlternativePress(alternative)}
             image={getMarkerIcon('alternative')}
             pinColor="green" // Fallback if no custom image
+            tracksViewChanges={false} // Prevent unnecessary re-renders
           />
         ))}
 
@@ -959,6 +962,7 @@ const getSafetyColor = (safetyLevel: string) => {
             }}
             image={getMarkerIcon('destination')}
             pinColor="blue" // Fallback if no custom image
+            tracksViewChanges={false} // Prevent unnecessary re-renders
           />
         )}
 
