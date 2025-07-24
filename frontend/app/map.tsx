@@ -87,14 +87,6 @@ const SAFETY_ZONES: SafetyZone[] = [
     type: 'security',
     description: 'Thomas and Dorothy Leavey Library - 24/7 access with security presence and emergency assistance available.',
   },
-  {
-    id: 'doheny-library',
-    name: 'Doheny Memorial Library',
-    latitude: 34.0200,
-    longitude: -118.2870,
-    type: 'security',
-    description: 'Historic Doheny Memorial Library - Central campus location with security monitoring and emergency phones.',
-  },
   
   // Emergency Blue Light Phones (strategically placed around campus)
   {
@@ -162,23 +154,6 @@ const SAFETY_ZONES: SafetyZone[] = [
     description: 'Blue light emergency phone in Engineering Quad. 24/7 monitoring and response.',
   },
   
-  // Campus Buildings with Security Presence
-  {
-    id: 'student-union',
-    name: 'Student Union Building',
-    latitude: 34.0195,
-    longitude: -118.2885,
-    type: 'security',
-    description: 'Student Union with security presence and high foot traffic. Safe area for parking and activities.',
-  },
-  {
-    id: 'bovard-auditorium',
-    name: 'Bovard Auditorium Area',
-    latitude: 34.0205,
-    longitude: -118.2875,
-    type: 'security',
-    description: 'Central campus location near Bovard Auditorium. Well-monitored area with regular security presence.',
-  },
   {
     id: 'usc-village',
     name: 'USC Village (Residential Security)',
@@ -190,14 +165,6 @@ const SAFETY_ZONES: SafetyZone[] = [
   
   // Security Patrol Zones (Yellow Jacket Areas)
   {
-    id: 'patrol-28th',
-    name: 'Yellow Jacket Patrol - 28th Street',
-    latitude: 34.0170,
-    longitude: -118.2840,
-    type: 'patrol',
-    description: 'Security ambassador patrol zone. Yellow jacket officers provide visible security presence.',
-  },
-  {
     id: 'patrol-jefferson',
     name: 'Yellow Jacket Patrol - Jefferson Blvd',
     latitude: 34.0160,
@@ -205,33 +172,6 @@ const SAFETY_ZONES: SafetyZone[] = [
     type: 'patrol',
     description: 'Active patrol zone with security ambassadors in bright yellow jackets for easy identification.',
   },
-  {
-    id: 'patrol-figueroa',
-    name: 'Yellow Jacket Patrol - Figueroa Corridor',
-    latitude: 34.0185,
-    longitude: -118.2810,
-    type: 'patrol',
-    description: 'High-visibility security patrol area along Figueroa Street corridor.',
-  },
-  
-  // Campus Entrances with Security
-  {
-    id: 'main-gate',
-    name: 'Main Campus Gate Security',
-    latitude: 34.0195,
-    longitude: -118.2815,
-    type: 'security',
-    description: 'Main campus entrance with security checkpoint and monitoring. Safe entry/exit point.',
-  },
-  {
-    id: 'watt-gate',
-    name: 'Watt Way Gate Security',
-    latitude: 34.0230,
-    longitude: -118.2870,
-    type: 'security',
-    description: 'Watt Way entrance with security presence and access control monitoring.',
-  },
-  
   // Original Caruso Center
   {
     id: 'caruso-center',
@@ -508,7 +448,7 @@ const MapScreen: React.FC = () => {
       
       try {
         console.log('Fetching reports from backend...');
-        const res = await fetch('http://192.168.1.101:3001/api/scooter-reports');
+        const res = await fetch('http://192.168.1.139:3001/api/scooter-reports');
         const data = await res.json();
         console.log('Backend response:', data);
         
@@ -688,7 +628,7 @@ const MapScreen: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://192.168.1.101:3001/api/analyze-route', {
+      const response = await fetch('http://192.168.1.139:3001/api/analyze-route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -869,15 +809,6 @@ const getSafetyColor = (safetyLevel: string) => {
         }}
       >
         {/* Test marker to verify markers are working */}
-        <Marker
-          key="test-marker"
-          coordinate={{
-            latitude: 34.0224,
-            longitude: -118.2851,
-          }}
-          pinColor="purple"
-          title="TEST MARKER - If you see this, markers work!"
-        />
 
         {/* Custom warning markers for danger zones (theft reports) */}
         {reports.map((report, index) => {

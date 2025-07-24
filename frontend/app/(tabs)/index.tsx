@@ -44,6 +44,11 @@ export default function LoginScreen() {
         <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
         <View style={styles.content}>
           <View style={styles.titleSection}>
+            <Image
+              source={require('../../assets/images/logo_no_color.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
             <Text style={styles.title}>IMMOBILI</Text>
             <Text style={styles.tagline}>Lock it down. Track it live.</Text>
           </View>
@@ -135,15 +140,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
   },
+  logo: {
+    width: 400,
+    height: 400,
+    marginBottom: -20,
+  },
   title: {
-    fontSize: 32,
+    fontSize: 50,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#166bf6',
     letterSpacing: 2,
   },
   tagline: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: '#fff',
     marginTop: 8,
   },
   formSection: {
@@ -217,14 +227,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   registerButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#2563eb',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
     width: '100%',
   },
   registerButtonText: {
-    color: '#2563eb',
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 1,
