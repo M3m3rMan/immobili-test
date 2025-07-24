@@ -4,13 +4,18 @@ import React, { useState } from 'react';
 import {
   Alert,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 
@@ -38,20 +43,31 @@ export default function RegisterScreen() {
     setLoading(true);
     
     try {
-      const res = await fetch('http://localhost:3001/api/register', {
+      // Updated to use the correct backend URL
+      const res = await fetch('http://192.168.1.139:3001/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, phone, password }),
       });
       const data = await res.json();
+      
       if (res.ok) {
-        Alert.alert('Success', 'Account created successfully!');
-        router.replace('/');
+        Alert.alert(
+          'Success', 
+          'Account created successfully! You can now sign in.',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/')
+            }
+          ]
+        );
       } else {
         Alert.alert('Error', data.error || 'Registration failed');
       }
     } catch (err) {
-      Alert.alert('Error', 'Network error. Please try again.');
+      console.error('Registration error:', err);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
     }
     
     setLoading(false);
@@ -61,116 +77,134 @@ export default function RegisterScreen() {
     router.replace('/');
   };
 
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
-        <View style={styles.content}>
-          <View style={styles.titleSection}>
-            <Image
-              source={require('../assets/images/logo_no_color.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.title}>Join us to secure your ride</Text>
-          </View>
-          <View style={styles.formSection}>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Username"
-                placeholderTextColor="#94a3b8"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-            <View style={styles.inputContainer}>
-              <Ionicons name="call-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Phone Number"
-                placeholderTextColor="#94a3b8"
-                value={phone}
-                onChangeText={setPhone}
-                keyboardType="phone-pad"
-                autoCorrect={false}
-              />
-            </View>
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#94a3b8"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={22}
-                  color="#94a3b8"
-                />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Confirm Password"
-                placeholderTextColor="#94a3b8"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry={!showConfirmPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? 'eye-off' : 'eye'}
-                  size={22}
-                  color="#94a3b8"
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={styles.registerButtonWrapper}>
-            {registerPressed && <View style={styles.glow} pointerEvents="none" />}
-            <Pressable
-              style={styles.registerButton}
-              onPressIn={() => setRegisterPressed(true)}
-              onPressOut={() => setRegisterPressed(false)}
-              onPress={handleRegister}
-              disabled={loading}
-              android_ripple={{ color: '#60a5fa' }}
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <ScrollView 
+              contentContainerStyle={styles.scrollContainer}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <Text style={styles.registerButtonText}>
-                {loading ? 'Creating Account...' : 'Continue'}
-              </Text>
-            </Pressable>
-          </View>
-          <View style={styles.signInSection}>
-            <Text style={styles.signInText}>Already have Account? </Text>
-            <TouchableOpacity onPress={handleSignInPress} activeOpacity={0.7}>
-              <Text style={styles.signInLink}>Sign in</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              <View style={styles.content}>
+                <View style={styles.titleSection}>
+                  <Image
+                    source={require('../assets/images/logo_no_color.png')}
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.title}>Join us to secure your ride</Text>
+                </View>
+                <View style={styles.formSection}>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="person-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Username"
+                      placeholderTextColor="#94a3b8"
+                      value={username}
+                      onChangeText={setUsername}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="call-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Phone Number"
+                      placeholderTextColor="#94a3b8"
+                      value={phone}
+                      onChangeText={setPhone}
+                      keyboardType="phone-pad"
+                      autoCorrect={false}
+                    />
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="lock-closed-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Password"
+                      placeholderTextColor="#94a3b8"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={showPassword ? 'eye-off' : 'eye'}
+                        size={22}
+                        color="#94a3b8"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <Ionicons name="lock-closed-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Confirm Password"
+                      placeholderTextColor="#94a3b8"
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      secureTextEntry={!showConfirmPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={showConfirmPassword ? 'eye-off' : 'eye'}
+                        size={22}
+                        color="#94a3b8"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={styles.registerButtonWrapper}>
+                  {registerPressed && <View style={styles.glow} pointerEvents="none" />}
+                  <Pressable
+                    style={styles.registerButton}
+                    onPressIn={() => setRegisterPressed(true)}
+                    onPressOut={() => setRegisterPressed(false)}
+                    onPress={handleRegister}
+                    disabled={loading}
+                    android_ripple={{ color: '#60a5fa' }}
+                  >
+                    <Text style={styles.registerButtonText}>
+                      {loading ? 'Creating Account...' : 'Continue'}
+                    </Text>
+                  </Pressable>
+                </View>
+                <View style={styles.signInSection}>
+                  <Text style={styles.signInText}>Already have Account? </Text>
+                  <TouchableOpacity onPress={handleSignInPress} activeOpacity={0.7}>
+                    <Text style={styles.signInLink}>Sign in</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </>
   );
@@ -180,20 +214,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1e293b',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   content: {
     flex: 1,
     padding: 24,
     justifyContent: 'center',
+    minHeight: '100%',
   },
   titleSection: {
     alignItems: 'center',
     marginBottom: 32,
   },
   logo: {
-    width: 400,
-    height: 400,
+    width: 300,
+    height: 300,
     marginBottom: -20,
   },
   title: {

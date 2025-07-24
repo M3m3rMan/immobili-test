@@ -481,44 +481,124 @@ function determineSafetyLevel(theftCount) {
 
 // Helper function to generate safe parking alternatives
 function generateSafeAlternatives(destLat, destLng, allReports) {
+  // Real USC area safe parking locations with actual addresses
+  const realSafeParkingSpots = [
+    {
+      name: "USC Village Parking Structure",
+      latitude: 34.0259,
+      longitude: -118.2851,
+      address: "2715 Portland St, Los Angeles, CA 90007",
+      description: "Secure parking structure with 24/7 security and good lighting"
+    },
+    {
+      name: "Leavey Library Bike Racks",
+      latitude: 34.0219,
+      longitude: -118.2829,
+      address: "650 Child's Way, Los Angeles, CA 90089",
+      description: "Well-lit bike racks near library entrance with high foot traffic"
+    },
+    {
+      name: "USC Bookstore Area",
+      latitude: 34.0205,
+      longitude: -118.2851,
+      address: "840 Childs Way, Los Angeles, CA 90089",
+      description: "Busy area with security cameras and regular patrols"
+    },
+    {
+      name: "Trousdale Parkway (Near Gate)",
+      latitude: 34.0195,
+      longitude: -118.2890,
+      address: "Trousdale Pkwy, Los Angeles, CA 90089",
+      description: "Main campus entrance with security presence and good visibility"
+    },
+    {
+      name: "Exposition Park (Natural History Museum)",
+      latitude: 34.0173,
+      longitude: -118.2887,
+      address: "900 Exposition Blvd, Los Angeles, CA 90007",
+      description: "Public area with museum security and regular maintenance"
+    },
+    {
+      name: "USC Caruso Catholic Center",
+      latitude: 34.0234,
+      longitude: -118.2901,
+      address: "3565 Trousdale Pkwy, Los Angeles, CA 90089",
+      description: "Quiet area with good lighting and community presence"
+    },
+    {
+      name: "Ronald Tutor Campus Center",
+      latitude: 34.0205,
+      longitude: -118.2886,
+      address: "3607 Trousdale Pkwy, Los Angeles, CA 90089",
+      description: "Central campus location with high student traffic"
+    },
+    {
+      name: "USC Parking Structure A",
+      latitude: 34.0188,
+      longitude: -118.2918,
+      address: "3335 S Figueroa St, Los Angeles, CA 90007",
+      description: "Secure parking structure near Figueroa Gate"
+    },
+    {
+      name: "Doheny Memorial Library",
+      latitude: 34.0201,
+      longitude: -118.2839,
+      address: "3550 Trousdale Pkwy, Los Angeles, CA 90089",
+      description: "Historic library area with good lighting and foot traffic"
+    },
+    {
+      name: "USC Marshall School Courtyard",
+      latitude: 34.0186,
+      longitude: -118.2851,
+      address: "3670 Trousdale Pkwy, Los Angeles, CA 90089",
+      description: "Business school area with security and professional atmosphere"
+    }
+  ];
+
   const alternatives = [];
-  const searchRadius = 0.2; // Reduce from 0.3 to 0.2 (200m instead of 300m)
-  const gridSize = 0.004; // Increase spacing (fewer points)
   
-  // Generate potential parking spots in a grid around destination
-  for (let latOffset = -searchRadius; latOffset <= searchRadius; latOffset += gridSize) {
-    for (let lngOffset = -searchRadius; lngOffset <= searchRadius; lngOffset += gridSize) {
-      const candidateLat = destLat + latOffset;
-      const candidateLng = destLng + lngOffset;
-      
-      // Skip if too close to destination (user probably wants to park there)
-      const distToDestination = calculateDistance(destLat, destLng, candidateLat, candidateLng);
-      if (distToDestination < 0.1) continue;
-      
-      // Count nearby thefts for this candidate location
+  // Filter and score real parking spots based on distance and safety
+  realSafeParkingSpots.forEach(spot => {
+    const distanceToDestination = calculateDistance(destLat, destLng, spot.latitude, spot.longitude);
+    
+    // Only include spots within reasonable walking distance (1km)
+    if (distanceToDestination <= 1.0) {
+      // Count nearby thefts for this real location
       const nearbyThefts = allReports.filter(report => {
-        const distance = calculateDistance(candidateLat, candidateLng, report.latitude, report.longitude);
-        return distance <= 0.2; // Within 200m
+        const distance = calculateDistance(spot.latitude, spot.longitude, report.latitude, report.longitude);
+        return distance <= 0.3; // Within 300m of this parking spot
       }).length;
       
-      // Only suggest locations with NO thefts (stricter)
-      if (nearbyThefts === 0) {
-        alternatives.push({
-          latitude: candidateLat,
-          longitude: candidateLng,
-          theftCount: nearbyThefts,
-          distanceFromDestination: distToDestination,
-          safetyScore: Math.max(0, 10 - nearbyThefts * 3), // Simple scoring
-          name: `Safe Parking ${alternatives.length + 1}`
-        });
-      }
+      // Calculate safety score based on theft count and distance
+      const baseScore = 10;
+      const theftPenalty = nearbyThefts * 2; // Less penalty than before
+      const distanceBonus = Math.max(0, 2 - distanceToDestination); // Closer is better
+      const safetyScore = Math.max(1, baseScore - theftPenalty + distanceBonus);
+      
+      alternatives.push({
+        latitude: spot.latitude,
+        longitude: spot.longitude,
+        theftCount: nearbyThefts,
+        distanceFromDestination: distanceToDestination,
+        safetyScore: Math.round(safetyScore),
+        name: spot.name,
+        address: spot.address,
+        description: spot.description
+      });
     }
-  }
+  });
   
-  // Return only top 2-3 instead of 5
+  // Return top 3 safest and closest alternatives
   return alternatives
-    .sort((a, b) => b.safetyScore - a.safetyScore || a.distanceFromDestination - b.distanceFromDestination)
-    .slice(0, 2); // Reduced from 5 to 2
+    .sort((a, b) => {
+      // Primary sort: safety score (higher is better)
+      if (b.safetyScore !== a.safetyScore) {
+        return b.safetyScore - a.safetyScore;
+      }
+      // Secondary sort: distance (closer is better)
+      return a.distanceFromDestination - b.distanceFromDestination;
+    })
+    .slice(0, 3);
 }
 
 app.post('/api/login', express.json(), async (req, res) => {

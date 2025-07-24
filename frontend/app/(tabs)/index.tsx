@@ -4,13 +4,18 @@ import React, { useState } from 'react';
 import {
   Alert,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { IconSymbol } from '../../components/ui/IconSymbol';
@@ -23,18 +28,52 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
+    if (!username || !password) {
+      Alert.alert('Error', 'Please enter both username and password');
+      return;
+    }
+
     setLoading(true);
     
-    // Bypass authentication and directly navigate to home
-    setTimeout(() => {
-      setLoading(false);
-      router.replace('/home');
-    }, 500);
+    try {
+      const res = await fetch('http://192.168.1.139:3001/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await res.json();
+      
+      if (res.ok) {
+        // Store user ID for future use if needed
+        console.log('Login successful, User ID:', data.userId);
+        Alert.alert(
+          'Success', 
+          'Login successful!',
+          [
+            {
+              text: 'OK',
+              onPress: () => router.replace('/home')
+            }
+          ]
+        );
+      } else {
+        Alert.alert('Error', data.error || 'Login failed');
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    }
+    
+    setLoading(false);
   };
 
   const handleRegisterPress = () => {
     router.push('/register');
+  };
+
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
   };
 
   return (
@@ -42,83 +81,100 @@ export default function LoginScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
-        <View style={styles.content}>
-          <View style={styles.titleSection}>
-            <Image
-              source={require('../../assets/images/logo_no_color.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-            <Text style={styles.title}>IMMOBILI</Text>
-            <Text style={styles.tagline}>Lock it down. Track it live.</Text>
-          </View>
-          <View style={styles.formSection}>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Username"
-                placeholderTextColor="#94a3b8"
-                value={username}
-                onChangeText={setUsername}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <View style={styles.userIcon}>
-                <Image
-                  source={require('../../assets/images/Face_ID_logo.png')}
-                  style={{ width: 20, height: 20, resizeMode: 'contain' }}
-                />
-              </View>
-            </View>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#94a3b8"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword(!showPassword)}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={22}
-                  color="#94a3b8"
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={styles.signInButtonWrapper}>
-            {signInPressed && <View style={styles.glow} pointerEvents="none" />}
-            <Pressable
-              style={styles.signInButton}
-              onPressIn={() => setSignInPressed(true)}
-              onPressOut={() => setSignInPressed(false)}
-              onPress={handleLogin}
-              android_ripple={{ color: '#60a5fa' }}
+        <KeyboardAvoidingView 
+          style={styles.keyboardAvoidingView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <TouchableWithoutFeedback onPress={dismissKeyboard}>
+            <ScrollView 
+              contentContainerStyle={styles.scrollContainer}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
             >
-              <Text style={styles.signInButtonText}>Sign In</Text>
-            </Pressable>
-          </View>
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          <TouchableOpacity
-            style={styles.registerButton}
-            activeOpacity={0.8}
-            onPress={handleRegisterPress}
-          >
-            <Text style={styles.registerButtonText}>Register</Text>
-          </TouchableOpacity>
-        </View>
+              <View style={styles.content}>
+                <View style={styles.titleSection}>
+                  <Image
+                    source={require('../../assets/images/logo_no_color.png')}
+                    style={styles.logo}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.title}>IMMOBILI</Text>
+                  <Text style={styles.tagline}>Lock it down. Track it live.</Text>
+                </View>
+                <View style={styles.formSection}>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Username"
+                      placeholderTextColor="#94a3b8"
+                      value={username}
+                      onChangeText={setUsername}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <View style={styles.userIcon}>
+                      <Image
+                        source={require('../../assets/images/Face_ID_logo.png')}
+                        style={{ width: 20, height: 20, resizeMode: 'contain' }}
+                      />
+                    </View>
+                  </View>
+                  <View style={styles.inputContainer}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Password"
+                      placeholderTextColor="#94a3b8"
+                      value={password}
+                      onChangeText={setPassword}
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                    <TouchableOpacity
+                      style={styles.eyeButton}
+                      onPress={() => setShowPassword(!showPassword)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name={showPassword ? 'eye-off' : 'eye'}
+                        size={22}
+                        color="#94a3b8"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={styles.signInButtonWrapper}>
+                  {signInPressed && <View style={styles.glow} pointerEvents="none" />}
+                  <Pressable
+                    style={styles.signInButton}
+                    onPressIn={() => setSignInPressed(true)}
+                    onPressOut={() => setSignInPressed(false)}
+                    onPress={handleLogin}
+                    disabled={loading}
+                    android_ripple={{ color: '#60a5fa' }}
+                  >
+                    <Text style={styles.signInButtonText}>
+                      {loading ? 'Signing In...' : 'Sign In'}
+                    </Text>
+                  </Pressable>
+                </View>
+                <View style={styles.divider}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>or</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <TouchableOpacity
+                  style={styles.registerButton}
+                  activeOpacity={0.8}
+                  onPress={handleRegisterPress}
+                >
+                  <Text style={styles.registerButtonText}>Register</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </>
   );
@@ -129,20 +185,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#1e293b',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
   },
   content: {
     flex: 1,
     padding: 24,
     justifyContent: 'center',
+    minHeight: '100%',
   },
   titleSection: {
     alignItems: 'center',
     marginBottom: 32,
   },
   logo: {
-    width: 400,
-    height: 400,
+    width: 300,
+    height: 300,
     marginBottom: -20,
   },
   title: {

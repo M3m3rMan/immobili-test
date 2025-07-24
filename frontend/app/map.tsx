@@ -40,6 +40,8 @@ interface SafeAlternative {
   distanceFromDestination: number;
   safetyScore: number;
   name: string;
+  address?: string;
+  description?: string;
 }
 
 interface RouteAnalysis {
@@ -88,7 +90,7 @@ const SAFETY_ZONES: SafetyZone[] = [
     description: 'Thomas and Dorothy Leavey Library - 24/7 access with security presence and emergency assistance available.',
   },
   
-  // Emergency Blue Light Phones (strategically placed around campus)
+  // Key Emergency Blue Light Phones (reduced from 8 to 3 strategic locations)
   {
     id: 'emergency-trousdale',
     name: 'Emergency Call Box - Trousdale',
@@ -104,46 +106,6 @@ const SAFETY_ZONES: SafetyZone[] = [
     longitude: -118.2820,
     type: 'emergency',
     description: 'Emergency call box near main campus entrance. Direct connection to USC Department of Public Safety.',
-  },
-  {
-    id: 'emergency-alumni',
-    name: 'Emergency Call Box - Alumni Park',
-    latitude: 34.0210,
-    longitude: -118.2875,
-    type: 'emergency',
-    description: 'Blue light emergency phone in Alumni Park area. Available 24/7 for emergency assistance.',
-  },
-  {
-    id: 'emergency-mccarthy',
-    name: 'Emergency Call Box - McCarthy Way',
-    latitude: 34.0220,
-    longitude: -118.2825,
-    type: 'emergency',
-    description: 'Emergency phone near 24-hour campus entrance. Immediate connection to security dispatch.',
-  },
-  {
-    id: 'emergency-exposition',
-    name: 'Emergency Call Box - Exposition Blvd',
-    latitude: 34.0180,
-    longitude: -118.2860,
-    type: 'emergency',
-    description: 'Emergency call box on campus perimeter. Direct line to DPS for immediate response.',
-  },
-  {
-    id: 'emergency-parking',
-    name: 'Emergency Call Box - Parking Structure',
-    latitude: 34.0215,
-    longitude: -118.2840,
-    type: 'emergency',
-    description: 'Blue light phone in parking structure. Security cameras and emergency response available.',
-  },
-  {
-    id: 'emergency-science',
-    name: 'Emergency Call Box - Science Center',
-    latitude: 34.0195,
-    longitude: -118.2845,
-    type: 'emergency',
-    description: 'Emergency phone near Science Center. Well-lit area with regular security patrols.',
   },
   {
     id: 'emergency-engineering',
@@ -163,16 +125,7 @@ const SAFETY_ZONES: SafetyZone[] = [
     description: 'USC Village residential area with 24/7 security officers, biometric access, and surveillance cameras.',
   },
   
-  // Security Patrol Zones (Yellow Jacket Areas)
-  {
-    id: 'patrol-jefferson',
-    name: 'Yellow Jacket Patrol - Jefferson Blvd',
-    latitude: 34.0160,
-    longitude: -118.2880,
-    type: 'patrol',
-    description: 'Active patrol zone with security ambassadors in bright yellow jackets for easy identification.',
-  },
-  // Original Caruso Center
+  // Caruso Center
   {
     id: 'caruso-center',
     name: 'Our Savior Parish & USC Caruso Catholic Center',
@@ -1051,12 +1004,22 @@ const getSafetyColor = (safetyLevel: string) => {
               
               <View style={styles.statusContainer}>
                 <View style={styles.statusItem}>
-                  <Text style={styles.statusLabel}>Status</Text>
-                  <Text style={styles.statusValue}>Open</Text>
+                  <View style={styles.statusIconContainer}>
+                    <Text style={styles.statusIcon}>📋</Text>
+                  </View>
+                  <View style={styles.statusContent}>
+                    <Text style={styles.statusLabel}>Status</Text>
+                    <Text style={styles.statusValue}>Open</Text>
+                  </View>
                 </View>
                 <View style={styles.statusItem}>
-                  <Text style={styles.statusLabel}>Police Response</Text>
-                  <Text style={styles.statusValueGreen}>Report filed</Text>
+                  <View style={styles.statusIconContainer}>
+                    <Text style={styles.statusIcon}>🚔</Text>
+                  </View>
+                  <View style={styles.statusContent}>
+                    <Text style={styles.statusLabel}>Police Response</Text>
+                    <Text style={styles.statusValueGreen}>Report filed</Text>
+                  </View>
                 </View>
               </View>
               
@@ -1109,14 +1072,24 @@ const getSafetyColor = (safetyLevel: string) => {
               
               <View style={styles.statusContainer}>
                 <View style={styles.statusItem}>
-                  <Text style={styles.statusLabel}>Zone Type</Text>
-                  <Text style={styles.statusValueGreen}>
-                    {selectedSafetyZone.type === 'security' ? 'Security Monitored' : 'Safe Parking'}
-                  </Text>
+                  <View style={styles.statusIconContainer}>
+                    <Text style={styles.statusIcon}>🏢</Text>
+                  </View>
+                  <View style={styles.statusContent}>
+                    <Text style={styles.statusLabel}>Zone Type</Text>
+                    <Text style={styles.statusValueGreen}>
+                      {selectedSafetyZone.type === 'security' ? 'Security Monitored' : 'Safe Parking'}
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.statusItem}>
-                  <Text style={styles.statusLabel}>Recommendation</Text>
-                  <Text style={styles.statusValueGreen}>Highly Recommended</Text>
+                  <View style={styles.statusIconContainer}>
+                    <Text style={styles.statusIcon}>⭐</Text>
+                  </View>
+                  <View style={styles.statusContent}>
+                    <Text style={styles.statusLabel}>Recommendation</Text>
+                    <Text style={styles.statusValueGreen}>Highly Recommended</Text>
+                  </View>
                 </View>
               </View>
               
@@ -1153,7 +1126,7 @@ const getSafetyColor = (safetyLevel: string) => {
             </View>
             <View style={styles.summaryContent}>
               <Text style={styles.summaryTitle}>{selectedSafeAlternative.name}</Text>
-              <Text style={styles.summaryLocation}>Safe Parking Alternative</Text>
+              <Text style={styles.summaryLocation}>{selectedSafeAlternative.address}</Text>
               <Text style={styles.summaryTime}>
                 Distance from destination: {(selectedSafeAlternative.distanceFromDestination * 1000).toFixed(0)}m
               </Text>
@@ -1169,28 +1142,42 @@ const getSafetyColor = (safetyLevel: string) => {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.detailsContent}>
-              <Text style={styles.detailsTitle}>Safe Parking Information</Text>
               <Text style={styles.detailsDescription}>
                 This location has been identified as a safer alternative for parking your scooter based on historical theft data and proximity to your destination.
               </Text>
               
+              {/* Enhanced status container with better visual appeal */}
               <View style={styles.statusContainer}>
                 <View style={styles.statusItem}>
-                  <Text style={styles.statusLabel}>Safety Score</Text>
-                  <Text style={styles.statusValueGreen}>
-                    {selectedSafeAlternative.safetyScore}/10
-                  </Text>
+                  <View style={styles.statusIconContainer}>
+                    <Text style={styles.statusIcon}>🛡️</Text>
+                  </View>
+                  <View style={styles.statusContent}>
+                    <Text style={styles.statusLabel}>Safety Score</Text>
+                    <Text style={styles.statusValueGreen}>
+                      {selectedSafeAlternative.safetyScore}/10
+                    </Text>
+                  </View>
                 </View>
                 <View style={styles.statusItem}>
-                  <Text style={styles.statusLabel}>Nearby Thefts</Text>
-                  <Text style={styles.statusValueGreen}>
-                    {selectedSafeAlternative.theftCount}
-                  </Text>
+                  <View style={styles.statusIconContainer}>
+                    <Text style={styles.statusIcon}>⚠️</Text>
+                  </View>
+                  <View style={styles.statusContent}>
+                    <Text style={styles.statusLabel}>Nearby Thefts</Text>
+                    <Text style={styles.statusValueGreen}>
+                      {selectedSafeAlternative.theftCount}
+                    </Text>
+                  </View>
                 </View>
               </View>
               
+              {/* Enhanced safety tips section */}
               <View style={styles.fullReportSection}>
-                <Text style={styles.fullReportTitle}>Safety Tips</Text>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionIcon}>💡</Text>
+                  <Text style={styles.fullReportTitle}>Safety Tips</Text>
+                </View>
                 <Text style={styles.fullReportText}>
                   • Park in well-lit areas{'\n'}
                   • Use proper locking mechanisms{'\n'}
@@ -1409,15 +1396,24 @@ const styles = StyleSheet.create({
   },
   statusContainer: {
     flexDirection: 'row',
-    marginBottom: 24,
+    justifyContent: 'space-between',
+    marginVertical: 20,
+    gap: 12,
   },
   statusItem: {
     flex: 1,
-    marginRight: 16,
+    backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(48, 209, 88, 0.2)',
   },
   statusLabel: {
     color: '#8E8E93',
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
     marginBottom: 4,
   },
   statusValue: {
@@ -1427,8 +1423,8 @@ const styles = StyleSheet.create({
   },
   statusValueGreen: {
     color: '#30D158',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   statusValueRed: {
     color: '#FF3B30',
@@ -1487,20 +1483,20 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   fullReportSection: {
-    borderTopWidth: 1,
-    borderTopColor: '#2C2C2E',
-    paddingTop: 20,
+    backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 16,
   },
   fullReportTitle: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 12,
   },
   fullReportText: {
-    color: '#8E8E93',
+    color: '#E5E5E7',
     fontSize: 14,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   
   // Route planning styles
@@ -1743,6 +1739,82 @@ const styles = StyleSheet.create({
     color: '#8E8E93',
     fontSize: 12,
     marginRight: 4,
+  },
+  
+  addressSection: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(48, 209, 88, 0.2)',
+  },
+  addressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  addressLabel: {
+    color: '#30D158',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  addressText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '500',
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  descriptionText: {
+    color: '#8E8E93',
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  distanceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(48, 209, 88, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+  },
+  distanceIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  distanceText: {
+    color: '#30D158',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  
+  // Enhanced status styles
+  statusIconContainer: {
+    marginBottom: 8,
+  },
+  statusIcon: {
+    fontSize: 24,
+  },
+  statusContent: {
+    alignItems: 'center',
+  },
+  
+  // Enhanced section header styles
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionIcon: {
+    fontSize: 18,
+    marginRight: 8,
   },
 });
 
