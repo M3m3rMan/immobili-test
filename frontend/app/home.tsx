@@ -11,6 +11,7 @@ import { useRouter } from "expo-router";
 
 const ScooterDashboard: React.FC = () => {
   const router = useRouter();
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header with title and profile */}
@@ -48,22 +49,24 @@ const ScooterDashboard: React.FC = () => {
         </Text>
       </View>
 
-      {/* Lock button */}
-      <TouchableOpacity style={styles.lockButton} activeOpacity={0.8}>
-        <View style={styles.lockIconContainer}>
-          <Image
-            source={{
-              uri: "https://api.builder.io/api/v1/image/assets/TEMP/098eec73d27d5c64cb08e16a60ca3998a3635614?width=56",
-            }}
-            style={styles.lockIcon}
-          />
-        </View>
-        <Text style={styles.lockText}>Lock</Text>
-      </TouchableOpacity>
+      {/* Report Button */}
+      <View style={styles.reportContainer}>
+        <TouchableOpacity
+          style={styles.reportButton}
+          onPress={() => router.push("/report")}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.reportButtonText}>Report Issue</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Bottom cards */}
       <View style={styles.cardsContainer}>
-        <View style={styles.securityCard}>
+        <TouchableOpacity
+          style={styles.securityCard}
+          onPress={() => router.push("/community")}
+          activeOpacity={0.8}
+        >
           <View style={styles.cardIconContainer}>
             <Image
               source={{
@@ -73,10 +76,10 @@ const ScooterDashboard: React.FC = () => {
             />
           </View>
           <View style={styles.cardTextContainer}>
-            <Text style={styles.cardTitle}>Security System</Text>
-            <Text style={styles.cardSubtitle}>Alarm & Sensor</Text>
+            <Text style={styles.cardTitle}>Community Page</Text>
+            <Text style={styles.cardSubtitle}>Talk to people in your community</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.analyzerCard}
@@ -104,55 +107,54 @@ const ScooterDashboard: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#101827",
+    backgroundColor: "#1F2937",
     paddingHorizontal: 16,
     paddingTop: 16,
   },
   headerContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 32,
-    paddingHorizontal: 8,
+    alignItems: "center",
+    marginTop: 32,
+    marginBottom: 16,
+    paddingHorizontal: 24,
   },
   titleContainer: {
     alignItems: "flex-start",
+    flex: 1,
   },
   title: {
-    fontSize: 20,
+    fontSize: 28,
     fontWeight: "700",
     color: "#FFFFFF",
     fontFamily: "Inter",
-    lineHeight: 21,
+    lineHeight: 34,
     letterSpacing: -0.32,
   },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 4,
+    marginTop: 8,
   },
   statusDot: {
-    width: 11,
-    height: 11,
+    width: 12,
+    height: 12,
     backgroundColor: "#22C55D",
-    borderRadius: 5.5,
+    borderRadius: 6,
     marginRight: 8,
   },
   statusText: {
-    fontSize: 18,
-    fontWeight: "400",
+    fontSize: 16,
+    fontWeight: "600",
     color: "#22C55D",
     fontFamily: "Inter",
-    lineHeight: 21,
+    lineHeight: 20,
     letterSpacing: -0.32,
-    textShadowColor: "rgba(0, 0, 0, 0.25)",
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 4,
   },
   profileImage: {
-    width: 57,
-    height: 57,
-    borderRadius: 28.5,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     shadowColor: "rgba(0, 0, 0, 0.25)",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
@@ -161,148 +163,142 @@ const styles = StyleSheet.create({
   },
   scooterContainer: {
     alignItems: "center",
-    marginBottom: 40,
-    paddingHorizontal: 20,
+    marginBottom: 0,
+    marginTop: 40,
+    height: 400,
+    justifyContent: "center",
   },
   scooterImage: {
-    width: 350,
-    height: 350,
+    width: 550,
+    height: 550,
     resizeMode: "contain",
   },
   locationContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 0,
+    marginTop: 40,
   },
   locationDot: {
-    width: 11,
-    height: 11,
+    width: 10,
+    height: 10,
     backgroundColor: "#22C55D",
-    borderRadius: 5.5,
-    marginRight: 8,
+    borderRadius: 5,
+    marginRight: 10,
   },
   locationText: {
-    fontSize: 13,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
     color: "#FFFFFF",
     fontFamily: "Inter",
     lineHeight: 21,
     letterSpacing: 0.5,
   },
-  lockButton: {
-    flexDirection: "row",
+  reportContainer: {
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#48586B",
-    borderRadius: 50,
-    borderWidth: 1,
-    borderColor: "#48586B",
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    marginHorizontal: 20,
     marginBottom: 32,
-    shadowColor: "rgba(0, 0, 0, 0.25)",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 2,
+    marginTop: 20,
   },
-  lockIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "#374151",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  lockIcon: {
-    width: 28,
-    height: 28,
-    shadowColor: "rgba(0, 0, 0, 0.25)",
+  reportButton: {
+    backgroundColor: "#DC2626",
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 30,
+    shadowColor: "rgba(220, 38, 38, 0.25)",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowRadius: 8,
+    elevation: 5,
+    marginBottom: 10,
   },
-  lockText: {
+  reportButtonText: {
     fontSize: 18,
     fontWeight: "700",
     color: "#FFFFFF",
     fontFamily: "Inter",
-    lineHeight: 21,
+    textAlign: "center",
   },
   cardsContainer: {
     flexDirection: "row",
-    gap: 16,
-    paddingHorizontal: 4,
+    gap: 18,
+    paddingHorizontal: 16,
     marginBottom: 32,
+    marginTop: -30, // Move up or down the cards
+  },
+  card: {
+    flex: 1,
+    backgroundColor: "#232e41",
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#48586B",
+    padding: 18,
+
   },
   securityCard: {
     flex: 1,
-    backgroundColor: "#1F2937",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#1F2937",
-    padding: 16,
-    shadowColor: "rgba(0, 0, 0, 0.25)",
+    backgroundColor: "#232e41",
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#48586B",
+    padding: 18,
+    shadowColor: "rgba(0, 0, 0, 0.18)",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 4,
     alignItems: "center",
   },
   analyzerCard: {
     flex: 1,
-    backgroundColor: "#1F2937",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#1F2937",
-    padding: 16,
-    shadowColor: "rgba(0, 0, 0, 0.25)",
+    backgroundColor: "#232e41",
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: "#48586B",
+    padding: 18,
+    shadowColor: "rgba(0, 0, 0, 0.18)",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 4,
     alignItems: "center",
   },
   cardIconContainer: {
-    width: 30,
-    height: 32,
+    width: 36,
+    height: 36,
     backgroundColor: "#374151",
-    borderRadius: 15,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#1F2937",
+    borderColor: "#232e41",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cardIcon: {
-    width: 25,
-    height: 25,
+    width: 28,
+    height: 28,
   },
   cardTextContainer: {
     alignItems: "center",
   },
   cardTitle: {
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: "700",
     color: "#FFFFFF",
     fontFamily: "Inter",
-    lineHeight: 21,
+    lineHeight: 22,
     letterSpacing: -0.32,
     textAlign: "center",
   },
   cardSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
     color: "#7B8390",
     fontFamily: "Inter",
-    lineHeight: 21,
+    lineHeight: 18,
     letterSpacing: -0.32,
     textAlign: "center",
-    marginTop: 2,
+    marginTop: 4,
   },
 });
 
