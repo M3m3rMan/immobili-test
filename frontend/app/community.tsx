@@ -13,10 +13,11 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Conditional imports for camera functionality
 let ImagePicker: any = null;
@@ -33,53 +34,45 @@ if (Platform.OS !== 'web') {
 
 const { width, height } = Dimensions.get('window');
 
+// Sample posts data to match the example
+const SAMPLE_POSTS: CommunityPost[] = [
+  {
+    _id: '1',
+    username: 'ScooterRider23',
+    avatar: '🛴',
+    text: 'Just found an amazing new route through campus! Perfect for avoiding the busy streets. Anyone want to join me tomorrow?',
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
+    timestamp: '2h ago',
+    likes: 12,
+    comments: 3,
+    location: 'USC',
+    userId: 'user1' //tobi
+  },
+  {
+    _id: '2',
+    username: 'EcoCommuter',
+    avatar: '🌱',
+    text: 'PSA: Remember to always lock your scooters! Saw three unlocked ones today that could easily be stolen. Stay safe everyone! 🔒',
+    timestamp: '4h ago',
+    likes: 28,
+    comments: 7,
+    location: 'UCLA',
+    userId: 'user2'
+  }
+];
+
 interface CommunityPost {
-  id: string;
+  _id: string;
   username: string;
   avatar: string;
   text: string;
   image?: string;
-  timestamp: Date;
+  timestamp?: string; // Made optional to handle undefined cases
   likes: number;
   comments: number;
   location?: string;
+  userId: string | { _id: string; username: string };
 }
-
-// Sample community posts
-const SAMPLE_POSTS: CommunityPost[] = [
-  {
-    id: '1',
-    username: 'ScooterRider23',
-    avatar: '🛴',
-    text: 'Just found an amazing new route through campus! Perfect for avoiding the busy streets. Anyone want to join me tomorrow?',
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    likes: 12,
-    comments: 3,
-    location: 'USC'
-  },
-  {
-    id: '2',
-    username: 'EcoCommuter',
-    avatar: '🌱',
-    text: 'PSA: Remember to always lock your scooters! Saw three unlocked ones today that could easily be stolen. Stay safe everyone! 🔒',
-    timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000),
-    likes: 28,
-    comments: 7,
-    location: 'UCLA'
-  },
-  {
-    id: '3',
-    username: 'SpeedDemon',
-    avatar: '⚡',
-    text: 'New personal record! 25 miles on a single charge. This new battery upgrade is incredible!',
-    image: 'https://images.unsplash.com/photo-1571068316344-75bc76f77890?w=400',
-    timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000),
-    likes: 15,
-    comments: 5,
-    location: 'USC'
-  }
-];
 
 export default function Community() {
   const router = useRouter();
@@ -88,6 +81,10 @@ export default function Community() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [username, setUsername] = useState<string | null>(null);
   
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
@@ -95,7 +92,57 @@ export default function Community() {
 
   useEffect(() => {
     requestCameraPermission();
+    loadUserData();
+    fetchPosts();
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      const storedUserId = await AsyncStorage.getItem('userId');
+      const storedUsername = await AsyncStorage.getItem('username');
+      console.log('Loaded user data:', { storedUserId, storedUsername });
+      setUserId(storedUserId);
+      setUsername(storedUsername);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const fetchPosts = async () => {
+    try {
+      setPostsLoading(true);
+      const response = await fetch('http://192.168.1.139:3001/api/community-posts');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched posts data:', data);
+        
+        // The backend returns { posts: [...] }, so we need to access data.posts
+        const fetchedPosts = data.posts || [];
+        
+        // Process the posts to handle populated user data
+        const processedPosts = fetchedPosts.map((post: any) => ({
+          ...post,
+          // If userId is populated, use the username from the populated user object
+          username: post.userId?.username || post.username || 'Anonymous',
+          timestamp: formatTimeAgo(post.timestamp)
+        }));
+        
+        console.log('Processed posts:', processedPosts);
+        
+        // Combine fetched posts with sample posts, ensuring we always have content
+        const allPosts = [...processedPosts, ...SAMPLE_POSTS];
+        setPosts(allPosts);
+      } else {
+        console.error('Failed to fetch posts:', response.status);
+        setPosts(SAMPLE_POSTS); // Use sample posts on error
+      }
+    } catch (error) {
+      console.error('Error fetching posts:', error);
+      setPosts(SAMPLE_POSTS); // Use sample posts on error
+    } finally {
+      setPostsLoading(false);
+    }
+  };
 
   const requestCameraPermission = async () => {
     if (Platform.OS === 'web' || !ImagePicker) {
@@ -167,178 +214,337 @@ export default function Community() {
     }
   };
 
-  const createPost = () => {
+  const createPost = async () => {
     if (!newPostText.trim() && !selectedImage) {
       Alert.alert('Error', 'Please add some text or an image to your post.');
       return;
     }
 
-    const newPost: CommunityPost = {
-      id: Date.now().toString(),
-      username: 'You',
-      avatar: '👤',
-      text: newPostText,
-      image: selectedImage || undefined,
-      timestamp: new Date(),
-      likes: 0,
-      comments: 0,
-      location: 'Your Location'
-    };
+    if (!userId) {
+      Alert.alert('Error', 'You must be logged in to create a post.');
+      return;
+    }
 
-    setPosts([newPost, ...posts]);
-    setNewPostText('');
-    setSelectedImage(null);
-    setShowCreatePost(false);
-    Alert.alert('Success', 'Your post has been shared with the community!');
+    setLoading(true);
+    try {
+      // Store the values before clearing them
+      const postText = newPostText;
+      const postImage = selectedImage;
+      
+      // Create a new post object for immediate display
+      const newPost: CommunityPost = {
+        _id: Date.now().toString(), // Temporary ID
+        username: username || 'Anonymous',
+        avatar: '🛴',
+        text: postText,
+        image: postImage || undefined,
+        timestamp: 'Just now',
+        likes: 0,
+        comments: 0,
+        location: 'Your Location',
+        userId: userId,
+      };
+
+      console.log('Creating new post:', { postText, username, userId, newPost });
+
+      // Add the new post to the beginning of the posts array
+      setPosts(prevPosts => [newPost, ...prevPosts]);
+      
+      // Clear the form and close modal
+      setNewPostText('');
+      setSelectedImage(null);
+      setShowCreatePost(false);
+      Alert.alert('Success', 'Your post has been shared with the community!');
+
+      // Try to save to backend (optional - if it fails, the post is still shown locally)
+      try {
+        const response = await fetch('http://192.168.1.139:3001/api/community-posts', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: postText,
+            userId: userId,
+            username: username, // Include username in the request
+            image: postImage || undefined,
+          }),
+        });
+
+        if (response.ok) {
+          const savedPost = await response.json();
+          // Update the temporary post with the real one from backend
+          setPosts(prevPosts => 
+            prevPosts.map(post => 
+              post._id === newPost._id ? { ...savedPost, timestamp: formatTimeAgo(savedPost.timestamp) } : post
+            )
+          );
+        }
+      } catch (backendError) {
+        console.error('Backend save failed, but post is shown locally:', backendError);
+      }
+    } catch (error) {
+      console.error('Error creating post:', error);
+      Alert.alert('Error', 'Failed to create post. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const formatTimeAgo = (timestamp: Date) => {
-    const now = new Date();
-    const diffInHours = Math.floor((now.getTime() - timestamp.getTime()) / (1000 * 60 * 60));
+  const formatTimeAgo = (timestamp?: string) => {
+    // Handle undefined or null timestamps
+    if (!timestamp) {
+      return 'Just now';
+    }
     
-    if (diffInHours < 1) return 'Just now';
+    // If it's already a formatted string like "2h ago", return as is
+    if (timestamp.includes('ago') || timestamp.includes('now')) {
+      return timestamp;
+    }
+    
+    // Otherwise, format the ISO timestamp
+    const now = new Date();
+    const postTime = new Date(timestamp);
+    
+    // Check if the date is valid
+    if (isNaN(postTime.getTime())) {
+      return 'Just now';
+    }
+    
+    const diffInMinutes = Math.floor((now.getTime() - postTime.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 1) return 'Just now';
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    
+    const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    return `${Math.floor(diffInHours / 24)}d ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `${diffInDays}d ago`;
   };
 
-  const likePost = (postId: string) => {
-    setPosts(posts.map(post => 
-      post.id === postId 
-        ? { ...post, likes: post.likes + 1 }
-        : post
-    ));
+  const likePost = async (postId: string) => {
+    try {
+      const response = await fetch(`http://192.168.1.139:3001/api/community-posts/${postId}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Update the local state to reflect the new like count
+        setPosts(prevPosts => 
+          prevPosts.map(post => 
+            post._id === postId 
+              ? { ...post, likes: data.likes }
+              : post
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error liking post:', error);
+    }
   };
 
-  const renderPost = (post: CommunityPost) => (
-    <View key={post.id} style={styles.postContainer}>
-      <View style={styles.postHeader}>
-        <View style={styles.userInfo}>
-          <Text style={styles.avatar}>{post.avatar}</Text>
-          <View>
-            <Text style={styles.username}>{post.username}</Text>
-            <Text style={styles.timestamp}>{formatTimeAgo(post.timestamp)}</Text>
-          </View>
-        </View>
-        {post.location && (
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={12} color="#666" />
-            <Text style={styles.location}>{post.location}</Text>
-          </View>
-        )}
-      </View>
-      
-      <Text style={styles.postText}>{post.text}</Text>
-      
-      {post.image && (
-        <Image source={{ uri: post.image }} style={styles.postImage} />
-      )}
-      
-      <View style={styles.postActions}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={() => likePost(post.id)}
-        >
-          <Ionicons name="heart-outline" size={20} color={tintColor} />
-          <Text style={[styles.actionText, { color: tintColor }]}>{post.likes}</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="chatbubble-outline" size={20} color={tintColor} />
-          <Text style={[styles.actionText, { color: tintColor }]}>{post.comments}</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton}>
-          <Ionicons name="share-outline" size={20} color={tintColor} />
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const deletePost = async (postId: string) => {
+    if (!userId) {
+      Alert.alert('Error', 'You must be logged in to delete posts.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete Post',
+      'Are you sure you want to delete this post?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await fetch(`http://192.168.1.139:3001/api/community-posts/${postId}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ userId }),
+              });
+
+              if (response.ok) {
+                // Remove the post from local state
+                setPosts(prevPosts => prevPosts.filter(post => post._id !== postId));
+                Alert.alert('Success', 'Post deleted successfully.');
+              } else {
+                const errorData = await response.json();
+                Alert.alert('Error', errorData.error || 'Failed to delete post.');
+              }
+            } catch (error) {
+              console.error('Error deleting post:', error);
+              Alert.alert('Error', 'Failed to delete post. Please try again.');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
-    <>
-      <Stack.Screen options={{ headerShown: false }} />
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Scooter Community</Text>
-          <TouchableOpacity onPress={() => setShowCreatePost(true)}>
-            <Ionicons name="add" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Scooter Community</Text>
+        <TouchableOpacity onPress={() => setShowCreatePost(true)}>
+          <Ionicons name="add" size={24} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
 
-        {/* Community Feed */}
-        <ScrollView style={styles.feed} showsVerticalScrollIndicator={false}>
-          <View style={styles.welcomeSection}>
-            <Text style={styles.welcomeTitle}>Welcome to the Community! 🛴</Text>
-            <Text style={styles.welcomeText}>
-              Share your scooter experiences, tips, and connect with fellow riders!
-            </Text>
+      {/* Community Feed */}
+      <ScrollView style={styles.feed} showsVerticalScrollIndicator={false}>
+        <View style={styles.welcomeSection}>
+          <Text style={styles.welcomeTitle}>Welcome to the Community! 🛴</Text>
+          <Text style={styles.welcomeText}>
+            Share your scooter experiences, tips, and connect with fellow riders!
+          </Text>
+        </View>
+        
+        {postsLoading ? (
+          <View style={styles.loadingContainer}>
+            <Text style={styles.loadingText}>Loading posts...</Text>
+          </View>
+        ) : posts.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No posts yet. Be the first to share!</Text>
+          </View>
+        ) : (
+          posts.map((post, index) => {
+            console.log('Rendering post:', { index, post });
+            const postUserId = typeof post.userId === 'object' ? post.userId._id : post.userId;
+            console.log('User ID comparison:', { postUserId, currentUserId: userId, shouldShowDelete: postUserId === userId });
+            return (
+            <View key={post._id || index} style={styles.postContainer}>
+              <View style={styles.postHeader}>
+                <View style={styles.userInfo}>
+                  <Text style={styles.avatar}>{post.avatar || '🛴'}</Text>
+                  <View>
+                    <Text style={styles.username}>{post.username || 'Anonymous'}</Text>
+                    <Text style={styles.timestamp}>{formatTimeAgo(post.timestamp)}</Text>
+                  </View>
+                </View>
+                <View style={styles.postHeaderRight}>
+                  {post.location && (
+                    <View style={styles.locationContainer}>
+                      <Ionicons name="location-outline" size={12} color="#9CA3AF" />
+                      <Text style={styles.location}>{post.location}</Text>
+                    </View>
+                  )}
+                  {((typeof post.userId === 'object' ? post.userId._id : post.userId) === userId) && (
+                    <TouchableOpacity 
+                      style={styles.deleteButton}
+                      onPress={() => deletePost(post._id)}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+              
+              <Text style={styles.postText}>{post.text || ''}</Text>
+              
+              {post.image && (
+                <Image source={{ uri: post.image }} style={styles.postImage} />
+              )}
+              
+              <View style={styles.postActions}>
+                <TouchableOpacity 
+                  style={styles.actionButton}
+                  onPress={() => likePost(post._id)}
+                >
+                  <Ionicons name="heart-outline" size={20} color={tintColor} />
+                  <Text style={[styles.actionText, { color: tintColor }]}>{post.likes || 0}</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.actionButton}>
+                  <Ionicons name="chatbubble-outline" size={20} color={tintColor} />
+                  <Text style={[styles.actionText, { color: tintColor }]}>{post.comments || 0}</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.actionButton}>
+                  <Ionicons name="share-outline" size={20} color={tintColor} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            );
+          })
+        )}
+      </ScrollView>
+
+      {/* Create Post Modal */}
+      <Modal
+        visible={showCreatePost}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <ThemedView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowCreatePost(false)}>
+              <Text style={styles.cancelButton}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Create Post</Text>
+            <TouchableOpacity onPress={createPost} disabled={loading}>
+              <Text style={[styles.postButton, { color: tintColor }]}>
+                {loading ? 'Posting...' : 'Post'}
+              </Text>
+            </TouchableOpacity>
           </View>
           
-          {posts.map(renderPost)}
-        </ScrollView>
-
-        {/* Create Post Modal */}
-        <Modal
-          visible={showCreatePost}
-          animationType="slide"
-          presentationStyle="pageSheet"
-        >
-          <ThemedView style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowCreatePost(false)}>
-                <Text style={styles.cancelButton}>Cancel</Text>
+          <ScrollView style={styles.modalContent}>
+            <TextInput
+              style={styles.textInput}
+              placeholder="What's happening in the scooter world?"
+              placeholderTextColor="#FFFFFF"
+              multiline
+              value={newPostText}
+              onChangeText={setNewPostText}
+              maxLength={500}
+            />
+            
+            {selectedImage && (
+              <View style={styles.imagePreviewContainer}>
+                <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
+                <TouchableOpacity 
+                  style={styles.removeImageButton}
+                  onPress={() => setSelectedImage(null)}
+                >
+                  <Ionicons name="close-circle" size={24} color="#101827" />
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            <View style={styles.mediaButtons}>
+              <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
+                <Ionicons name="camera" size={24} color="#FFFFFF" />
+                <Text style={styles.mediaButtonText}>Take Photo</Text>
               </TouchableOpacity>
-              <Text style={styles.modalTitle}>Create Post</Text>
-              <TouchableOpacity onPress={createPost}>
-                <Text style={[styles.postButton, { color: tintColor }]}>Post</Text>
+              
+              <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
+                <Ionicons name="images" size={24} color="#FFFFFF" />
+                <Text style={styles.mediaButtonText}>Choose Photo</Text>
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.modalContent}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="What's happening in the scooter world?"
-                placeholderTextColor="#FFFFFF"
-                multiline
-                value={newPostText}
-                onChangeText={setNewPostText}
-                maxLength={500}
-              />
-              
-              {selectedImage && (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: selectedImage }} style={styles.imagePreview} />
-                  <TouchableOpacity 
-                    style={styles.removeImageButton}
-                    onPress={() => setSelectedImage(null)}
-                  >
-                    <Ionicons name="close-circle" size={24} color="#101827" />
-                  </TouchableOpacity>
-                </View>
-              )}
-              
-              <View style={styles.mediaButtons}>
-                <TouchableOpacity style={styles.mediaButton} onPress={takePhoto}>
-                  <Ionicons name="camera" size={24} color="#FFFFFF" />
-                  <Text style={styles.mediaButtonText}>Take Photo</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.mediaButton} onPress={pickImage}>
-                  <Ionicons name="images" size={24} color="#FFFFFF" />
-                  <Text style={styles.mediaButtonText}>Choose Photo</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <Text style={styles.characterCount}>{newPostText.length}/500</Text>
-            </ScrollView>
-          </ThemedView>
-        </Modal>
-      </View>
-    </>
+            <Text style={styles.characterCount}>{newPostText.length}/500</Text>
+          </ScrollView>
+        </ThemedView>
+      </Modal>
+    </View>
   );
 }
 
@@ -346,22 +552,22 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#101827', // Updated background color
+    paddingTop: 60, // Add top padding for iPhone notch
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#374151', // Updated border color
-    backgroundColor: '#101827', // Updated header background
+    borderBottomColor: '#374151',
+    backgroundColor: '#101827',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#ffffff', // Fixed: Changed from #101827 to #FFFFFF for visibility
+    color: '#FFFFFF',
   },
   feed: {
     flex: 1,
@@ -369,6 +575,7 @@ const styles = StyleSheet.create({
   },
   welcomeSection: {
     padding: 20,
+    paddingTop: 20, // Reduced top padding since we have a header
     alignItems: 'center',
     backgroundColor: '#101827', // Updated welcome section background
   },
@@ -383,6 +590,22 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.7,
     color: '#FFFFFF', // Updated welcome text color
+    marginBottom: 16,
+  },
+  createPostButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  createPostButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   postContainer: {
     marginHorizontal: 16,
@@ -401,6 +624,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+  },
+  postHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deleteButton: {
+    padding: 4,
+    borderRadius: 4,
   },
   userInfo: {
     flexDirection: 'row',
@@ -546,5 +778,25 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontSize: 12,
     color: '#9CA3AF', // Updated character count color
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#9CA3AF',
+    textAlign: 'center',
   },
 });

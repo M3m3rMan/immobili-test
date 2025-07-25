@@ -10,6 +10,7 @@ export default function Layout() {
       <Stack.Screen name="CrimeDetailsScreen" options={{ headerShown: false }} />
       <Stack.Screen name="security" options={{ headerShown: false }} />
       <Stack.Screen name="register" options={{ headerShown: false }} />
+      <Stack.Screen name="community" options={{ headerShown: false }} />
     </Stack>
   );
 }

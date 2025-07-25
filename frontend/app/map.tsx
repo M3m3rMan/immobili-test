@@ -1,16 +1,26 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Image, Text, StyleSheet, Pressable, TextInput, ScrollView, Animated, Alert, Platform, TouchableOpacity, Dimensions, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
-import MapView, { Marker } from 'react-native-maps';
-import MapViewDirections from 'react-native-maps-directions';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
-// Conditional import to prevent native module errors on web
+// Conditional imports to prevent native module errors on web
 let Location: any = null;
+let MapView: any = null;
+let Marker: any = null;
+let MapViewDirections: any = null;
+
 if (Platform.OS !== 'web') {
   Location = require('expo-location');
+  try {
+    const mapModule = require('react-native-maps');
+    MapView = mapModule.default;
+    Marker = mapModule.Marker;
+    MapViewDirections = require('react-native-maps-directions').default;
+  } catch (error) {
+    console.log('Maps not available on this platform');
+  }
 }
 
 interface TheftReport {
@@ -283,7 +293,7 @@ const SAMPLE_REPORTS: TheftReport[] = [
 
 const MapScreen: React.FC = () => {
   const router = useRouter();
-  const mapRef = useRef<MapView>(null);
+  const mapRef = useRef<any>(null);
   const [reports, setReports] = useState<TheftReport[]>(SAMPLE_REPORTS);
   const [safetyZones] = useState<SafetyZone[]>(SAFETY_ZONES);
   const [selectedReport, setSelectedReport] = useState<TheftReport | null>(null);
@@ -859,14 +869,14 @@ const getSafetyColor = (safetyLevel: string) => {
             strokeWidth={10}
             strokeColor="#007AFF"
             optimizeWaypoints={true}
-            onStart={(params) => {
+            onStart={(params: any) => {
               console.log(`Started routing between "${params.origin}" and "${params.destination}"`);
             }}
-            onReady={(result) => {
+            onReady={(result: any) => {
               console.log(`Distance: ${result.distance} km`);
               console.log(`Duration: ${result.duration} min.`);
             }}
-            onError={(errorMessage) => {
+            onError={(errorMessage: any) => {
               console.log('Directions error:', errorMessage);
             }}
           />

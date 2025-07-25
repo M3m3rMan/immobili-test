@@ -18,6 +18,7 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IconSymbol } from '../../components/ui/IconSymbol';
 
 export default function LoginScreen() {
@@ -45,18 +46,11 @@ export default function LoginScreen() {
       const data = await res.json();
       
       if (res.ok) {
-        // Store user ID for future use if needed
+        // Store user ID and username for future use
         console.log('Login successful, User ID:', data.userId);
-        Alert.alert(
-          'Success', 
-          'Login successful!',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.replace('/home')
-            }
-          ]
-        );
+        await AsyncStorage.setItem('userId', data.userId);
+        await AsyncStorage.setItem('username', username);
+        router.replace('/home');
       } else {
         Alert.alert('Error', data.error || 'Login failed');
       }

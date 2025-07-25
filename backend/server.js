@@ -33,6 +33,20 @@ const UserSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', UserSchema);
 
+// Community Post Schema
+const CommunityPostSchema = new mongoose.Schema({
+  username: { type: String, required: true },
+  avatar: { type: String, default: '👤' },
+  text: { type: String, required: true },
+  image: { type: String }, // Optional image URL
+  timestamp: { type: Date, default: Date.now },
+  likes: { type: Number, default: 0 },
+  comments: { type: Number, default: 0 },
+  location: { type: String, default: 'Your Location' },
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
+});
+const CommunityPost = mongoose.model('CommunityPost', CommunityPostSchema);
+
 const openai = new OpenAI({ apiKey: process.env.OPEN_AI_KEY });
 
 // Function to calculate distance between two coordinates in kilometers
@@ -631,6 +645,106 @@ app.post('/api/register', express.json(), async (req, res) => {
     res.json({ message: 'Registration successful' });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+
+// Community Posts endpoints
+app.post('/api/community-posts', express.json(), async (req, res) => {
+  try {
+    const { text, image, userId } = req.body;
+    
+    if (!text || !userId) {
+      return res.status(400).json({ error: 'Text and userId are required' });
+    }
+
+    // Get user information to include username
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const newPost = new CommunityPost({
+      username: user.username,
+      text,
+      image: image || undefined,
+      userId,
+      avatar: '👤', // Default avatar
+      location: 'Your Location' // You can make this dynamic later
+    });
+
+    await newPost.save();
+    res.json({ message: 'Post created successfully', post: newPost });
+  } catch (err) {
+    console.error('Error creating post:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/community-posts', async (req, res) => {
+  try {
+    const posts = await CommunityPost.find()
+      .sort({ timestamp: -1 }) // Most recent first
+      .populate('userId', 'username') // Include username from user
+      .lean();
+
+    res.json({ posts });
+  } catch (err) {
+    console.error('Error fetching posts:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.post('/api/community-posts/:postId/like', express.json(), async (req, res) => {
+  try {
+    const { postId } = req.params;
+    
+    const post = await CommunityPost.findByIdAndUpdate(
+      postId,
+      { $inc: { likes: 1 } },
+      { new: true }
+    );
+
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    res.json({ message: 'Post liked', likes: post.likes });
+  } catch (err) {
+    console.error('Error liking post:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Delete post endpoint - only allows post creator to delete
+app.delete('/api/community-posts/:postId', express.json(), async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Find the post and check if the user is the creator
+    const post = await CommunityPost.findById(postId);
+    
+    if (!post) {
+      return res.status(404).json({ error: 'Post not found' });
+    }
+
+    // Check if the current user is the creator of the post
+    if (post.userId.toString() !== userId) {
+      return res.status(403).json({ error: 'You can only delete your own posts' });
+    }
+
+    // Delete the post
+    await CommunityPost.findByIdAndDelete(postId);
+    
+    res.json({ message: 'Post deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting post:', err);
+    res.status(500).json({ error: 'Server error' });
   }
 });
 
