@@ -411,7 +411,7 @@ const MapScreen: React.FC = () => {
       
       try {
         console.log('Fetching reports from backend...');
-        const res = await fetch('http://192.168.1.139:3001/api/scooter-reports');
+        const res = await fetch('http://192.168.1.101:3001/api/scooter-reports');
         const data = await res.json();
         console.log('Backend response:', data);
         
@@ -591,7 +591,7 @@ const MapScreen: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://192.168.1.139:3001/api/analyze-route', {
+      const response = await fetch('http://192.168.1.101:3001/api/analyze-route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

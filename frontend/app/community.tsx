@@ -18,19 +18,7 @@ import { useThemeColor } from '@/hooks/useThemeColor';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// Conditional imports for camera functionality
-let ImagePicker: any = null;
-let Camera: any = null;
-
-if (Platform.OS !== 'web') {
-  try {
-    ImagePicker = require('expo-image-picker');
-    Camera = require('expo-camera');
-  } catch (error) {
-    console.log('Camera modules not available');
-  }
-}
+import * as ImagePicker from 'expo-image-picker';
 
 const { width, height } = Dimensions.get('window');
 
@@ -83,6 +71,7 @@ export default function Community() {
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [userDataLoading, setUserDataLoading] = useState(true); // Add user data loading state
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   
@@ -96,22 +85,36 @@ export default function Community() {
     fetchPosts();
   }, []);
 
+  // Debug useEffect to// Track username state changes
+  useEffect(() => {
+    console.log('Username state changed to:', username);
+  }, [username]);
+
+  // Track userDataLoading state changes
+  useEffect(() => {
+    console.log('User data loading state changed to:', userDataLoading);
+  }, [userDataLoading]);
+
   const loadUserData = async () => {
     try {
+      setUserDataLoading(true);
       const storedUserId = await AsyncStorage.getItem('userId');
       const storedUsername = await AsyncStorage.getItem('username');
-      console.log('Loaded user data:', { storedUserId, storedUsername });
+      console.log('Loaded user data from AsyncStorage:', { storedUserId, storedUsername });
       setUserId(storedUserId);
       setUsername(storedUsername);
+      console.log('Set username state to:', storedUsername);
     } catch (error) {
       console.error('Error loading user data:', error);
+    } finally {
+      setUserDataLoading(false);
     }
   };
 
   const fetchPosts = async () => {
     try {
       setPostsLoading(true);
-      const response = await fetch('http://192.168.1.139:3001/api/community-posts');
+      const response = await fetch('http://192.168.1.101:3001/api/community-posts');
       if (response.ok) {
         const data = await response.json();
         console.log('Fetched posts data:', data);
@@ -145,7 +148,7 @@ export default function Community() {
   };
 
   const requestCameraPermission = async () => {
-    if (Platform.OS === 'web' || !ImagePicker) {
+    if (Platform.OS === 'web') {
       setCameraPermission(false);
       return;
     }
@@ -165,12 +168,12 @@ export default function Community() {
   };
 
   const takePhoto = async () => {
-    if (!ImagePicker) {
-      Alert.alert('Error', 'Camera not available on this platform.');
+    if (Platform.OS === 'web') {
+      Alert.alert('Not Available', 'Camera is not available on web platform.');
       return;
     }
 
-    if (!cameraPermission) {
+    if (cameraPermission === false) {
       Alert.alert('Permission Required', 'Camera permission is required to take photos.');
       return;
     }
@@ -193,8 +196,8 @@ export default function Community() {
   };
 
   const pickImage = async () => {
-    if (!ImagePicker || !cameraPermission) {
-      Alert.alert('Permission Required', 'Camera permission is required to take photos.');
+    if (Platform.OS === 'web') {
+      Alert.alert('Not Available', 'Image picker is not available on web platform.');
       return;
     }
 
@@ -210,8 +213,14 @@ export default function Community() {
         setSelectedImage(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
+      console.error('Image picker error:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
+  };
+
+  const openCreatePostModal = async () => {
+    // Simply open the modal - the createPost function will handle username retrieval
+    setShowCreatePost(true);
   };
 
   const createPost = async () => {
@@ -226,6 +235,25 @@ export default function Community() {
     }
 
     setLoading(true);
+    
+    // ALWAYS fetch username fresh from AsyncStorage - this is the key fix
+    let finalUsername = 'Anonymous';
+    try {
+      const storedUsername = await AsyncStorage.getItem('username');
+      console.log('🔍 Fresh username from AsyncStorage:', storedUsername);
+      
+      if (storedUsername && storedUsername.trim() !== '') {
+        finalUsername = storedUsername.trim();
+        // Also update the state for consistency
+        setUsername(finalUsername);
+        console.log('✅ Using username:', finalUsername);
+      } else {
+        console.warn('⚠️ No valid username found in AsyncStorage');
+      }
+    } catch (error) {
+      console.error('❌ Error fetching username from AsyncStorage:', error);
+    }
+
     try {
       // Store the values before clearing them
       const postText = newPostText;
@@ -234,7 +262,7 @@ export default function Community() {
       // Create a new post object for immediate display
       const newPost: CommunityPost = {
         _id: Date.now().toString(), // Temporary ID
-        username: username || 'Anonymous',
+        username: finalUsername,
         avatar: '🛴',
         text: postText,
         image: postImage || undefined,
@@ -245,7 +273,7 @@ export default function Community() {
         userId: userId,
       };
 
-      console.log('Creating new post:', { postText, username, userId, newPost });
+      console.log('📝 Creating post with username:', finalUsername);
 
       // Add the new post to the beginning of the posts array
       setPosts(prevPosts => [newPost, ...prevPosts]);
@@ -254,11 +282,13 @@ export default function Community() {
       setNewPostText('');
       setSelectedImage(null);
       setShowCreatePost(false);
-      Alert.alert('Success', 'Your post has been shared with the community!');
+      
+      // Show success message
+      Alert.alert('Success', `Post created as "${finalUsername}"`);
 
-      // Try to save to backend (optional - if it fails, the post is still shown locally)
+      // Try to save to backend
       try {
-        const response = await fetch('http://192.168.1.139:3001/api/community-posts', {
+        const response = await fetch('http://192.168.1.101:3001/api/community-posts', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -266,19 +296,22 @@ export default function Community() {
           body: JSON.stringify({
             text: postText,
             userId: userId,
-            username: username, // Include username in the request
+            username: finalUsername,
             image: postImage || undefined,
           }),
         });
 
         if (response.ok) {
           const savedPost = await response.json();
+          console.log('💾 Post saved to backend with username:', savedPost.username);
           // Update the temporary post with the real one from backend
           setPosts(prevPosts => 
             prevPosts.map(post => 
               post._id === newPost._id ? { ...savedPost, timestamp: formatTimeAgo(savedPost.timestamp) } : post
             )
           );
+        } else {
+          console.error('Backend save failed:', await response.text());
         }
       } catch (backendError) {
         console.error('Backend save failed, but post is shown locally:', backendError);
@@ -325,7 +358,7 @@ export default function Community() {
 
   const likePost = async (postId: string) => {
     try {
-      const response = await fetch(`http://192.168.1.139:3001/api/community-posts/${postId}/like`, {
+      const response = await fetch(`http://192.168.1.101:3001/api/community-posts/${postId}/like`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -367,7 +400,7 @@ export default function Community() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await fetch(`http://192.168.1.139:3001/api/community-posts/${postId}`, {
+              const response = await fetch(`http://192.168.1.101:3001/api/community-posts/${postId}`, {
                 method: 'DELETE',
                 headers: {
                   'Content-Type': 'application/json',
@@ -378,7 +411,6 @@ export default function Community() {
               if (response.ok) {
                 // Remove the post from local state
                 setPosts(prevPosts => prevPosts.filter(post => post._id !== postId));
-                Alert.alert('Success', 'Post deleted successfully.');
               } else {
                 const errorData = await response.json();
                 Alert.alert('Error', errorData.error || 'Failed to delete post.');
@@ -401,8 +433,16 @@ export default function Community() {
           <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Scooter Community</Text>
-        <TouchableOpacity onPress={() => setShowCreatePost(true)}>
-          <Ionicons name="add" size={24} color="#FFFFFF" />
+        <TouchableOpacity 
+          onPress={openCreatePostModal} 
+          disabled={userDataLoading}
+          style={{ opacity: userDataLoading ? 0.5 : 1 }}
+        >
+          {userDataLoading ? (
+            <Ionicons name="hourglass-outline" size={24} color="#FFFFFF" />
+          ) : (
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          )}
         </TouchableOpacity>
       </View>
 
