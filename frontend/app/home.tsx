@@ -6,100 +6,111 @@ import {
   StyleSheet,
   TouchableOpacity,
   SafeAreaView,
+  Dimensions,
+  ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 const ScooterDashboard: React.FC = () => {
   const router = useRouter();
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with title and profile */}
-      <View style={styles.headerContainer}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>My Scooter</Text>
-          <View style={styles.statusContainer}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>Available</Text>
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
+        {/* Header with title and profile */}
+        <View style={styles.headerContainer}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>My Scooter</Text>
+            <View style={styles.statusContainer}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>Available</Text>
+            </View>
           </View>
+          <Image
+            source={{
+              uri: "https://api.builder.io/api/v1/image/assets/TEMP/91972ddee7f73ce465849bf6f128876ac2787206?width=114",
+            }}
+            style={styles.profileImage}
+          />
         </View>
-        <Image
-          source={{
-            uri: "https://api.builder.io/api/v1/image/assets/TEMP/91972ddee7f73ce465849bf6f128876ac2787206?width=114",
-          }}
-          style={styles.profileImage}
-        />
-      </View>
 
-      {/* Main scooter image */}
-      <View style={styles.scooterContainer}>
-        <Image
-          source={{
-            uri: "https://api.builder.io/api/v1/image/assets/TEMP/25ce964af8c388a37bd0c5a094f3715eb65f905f?width=924",
-          }}
-          style={styles.scooterImage}
-        />
-      </View>
+        {/* Main scooter image */}
+        <View style={styles.scooterContainer}>
+          <Image
+            source={{
+              uri: "https://api.builder.io/api/v1/image/assets/TEMP/25ce964af8c388a37bd0c5a094f3715eb65f905f?width=924",
+            }}
+            style={styles.scooterImage}
+          />
+        </View>
 
-      {/* Current location */}
-      <View style={styles.locationContainer}>
-        <View style={styles.locationDot} />
-        <Text style={styles.locationText}>
-          Current Location: USC Campus
-        </Text>
-      </View>
+        {/* Current location */}
+        <View style={styles.locationContainer}>
+          <View style={styles.locationDot} />
+          <Text style={styles.locationText}>
+            Current Location: USC Campus
+          </Text>
+        </View>
 
-      {/* Report Button */}
-      <View style={styles.reportContainer}>
-        <TouchableOpacity
-          style={styles.reportButton}
-          onPress={() => router.push("/report")}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.reportButtonText}>Report Issue</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Report Button */}
+        <View style={styles.reportContainer}>
+          <TouchableOpacity
+            style={styles.reportButton}
+            onPress={() => router.push("/report")}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.reportButtonText}>Report Issue</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Bottom cards */}
-      <View style={styles.cardsContainer}>
-        <TouchableOpacity
-          style={styles.securityCard}
-          onPress={() => router.push("/community")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.cardIconContainer}>
-            <Image
-              source={{
-                uri: "https://api.builder.io/api/v1/image/assets/TEMP/752e97db974e549ecd825077f8fece72c632b4d1?width=50",
-              }}
-              style={styles.cardIcon}
-            />
-          </View>
-          <View style={styles.cardTextContainer}>
-            <Text style={styles.cardTitle}>Community Page</Text>
-            <Text style={styles.cardSubtitle}>Talk to people in your community</Text>
-          </View>
-        </TouchableOpacity>
+        {/* Bottom cards */}
+        <View style={styles.cardsContainer}>
+          <TouchableOpacity
+            style={styles.securityCard}
+            onPress={() => router.push("/community")}
+            activeOpacity={0.8}
+          >
+            <View style={styles.cardIconContainer}>
+              <Image
+                source={{
+                  uri: "https://api.builder.io/api/v1/image/assets/TEMP/752e97db974e549ecd825077f8fece72c632b4d1?width=50",
+                }}
+                style={styles.cardIcon}
+              />
+            </View>
+            <View style={styles.cardTextContainer}>
+              <Text style={styles.cardTitle}>Community Page</Text>
+              <Text style={styles.cardSubtitle}>Talk to people in your community</Text>
+            </View>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.analyzerCard}
-          onPress={() => router.push("/map")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.cardIconContainer}>
-            <Image
-              source={{
-                uri: "https://api.builder.io/api/v1/image/assets/TEMP/9a936899395fe6460434678f8415bb5f7cd426b0?width=50",
-              }}
-              style={styles.cardIcon}
-            />
-          </View>
-          <View style={styles.cardTextContainer}>
-            <Text style={styles.cardTitle}>Ai Analyzer</Text>
-            <Text style={styles.cardSubtitle}>Reports & Location</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.analyzerCard}
+            onPress={() => router.push("/map")}
+            activeOpacity={0.8}
+          >
+            <View style={styles.cardIconContainer}>
+              <Image
+                source={{
+                  uri: "https://api.builder.io/api/v1/image/assets/TEMP/9a936899395fe6460434678f8415bb5f7cd426b0?width=50",
+                }}
+                style={styles.cardIcon}
+              />
+            </View>
+            <View style={styles.cardTextContainer}>
+              <Text style={styles.cardTitle}>Ai Analyzer</Text>
+              <Text style={styles.cardSubtitle}>Reports & Location</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -108,6 +119,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#1F2937",
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
   },
@@ -165,13 +181,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 0,
     marginTop: 40,
-    height: 400,
+    height: 340,
     justifyContent: "center",
   },
   scooterImage: {
-    width: 550,
-    height: 550,
+    width: screenWidth * 1.1,
+    height: screenHeight * 1,
     resizeMode: "contain",
+    maxWidth: 400,
+    maxHeight: 465,
   },
   locationContainer: {
     flexDirection: "row",
@@ -223,17 +241,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 18,
     paddingHorizontal: 16,
-    marginBottom: 32,
-    marginTop: -30, // Move up or down the cards
-  },
-  card: {
-    flex: 1,
-    backgroundColor: "#232e41",
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: "#48586B",
-    padding: 18,
-
+    marginBottom: 40,
+    marginTop: -30,
   },
   securityCard: {
     flex: 1,
