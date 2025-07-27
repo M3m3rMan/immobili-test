@@ -3,6 +3,8 @@ import { View, Text, TextInput, TouchableOpacity, Switch, Alert, StyleSheet, Scr
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
+import ProfilePicture from '@/components/ProfilePicture';
 
 interface UserSettings {
   name: string;
@@ -26,6 +28,7 @@ export default function ProfilePage() {
 
   const loadUserSettings = async () => {
     try {
+      // First load from AsyncStorage for immediate display
       const storedUsername = await AsyncStorage.getItem('username');
       const storedEmail = await AsyncStorage.getItem('email');
       
@@ -34,6 +37,31 @@ export default function ProfilePage() {
       }
       if (storedEmail) {
         setSettings(prev => ({ ...prev, email: storedEmail }));
+      }
+
+      // Then load from backend to get the most up-to-date data
+      const userId = await AsyncStorage.getItem('userId');
+      if (userId) {
+        const response = await fetch(`http://192.168.1.101:3001/api/user-profile/${userId}`);
+        if (response.ok) {
+          const userData = await response.json();
+          const user = userData.user;
+          
+          // Update state with backend data
+          setSettings(prev => ({
+            ...prev,
+            name: user.username || prev.name,
+            email: user.email || prev.email,
+          }));
+
+          // Update AsyncStorage with backend data
+          if (user.username) {
+            await AsyncStorage.setItem('username', user.username);
+          }
+          if (user.email) {
+            await AsyncStorage.setItem('email', user.email);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading user settings:', error);
@@ -46,9 +74,38 @@ export default function ProfilePage() {
 
   const handleSaveSettings = async () => {
     try {
-      await AsyncStorage.setItem('username', settings.name);
-      await AsyncStorage.setItem('email', settings.email);
-      Alert.alert('Success', 'Settings saved successfully!');
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        Alert.alert('Error', 'User not found. Please log in again.');
+        return;
+      }
+
+      // Update backend first
+      const response = await fetch('http://192.168.1.101:3001/api/update-user-profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          username: settings.name,
+          email: settings.email,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Update AsyncStorage with the saved data
+        await AsyncStorage.setItem('username', settings.name);
+        await AsyncStorage.setItem('email', settings.email);
+        
+        // Navigate back to home page instead of showing alert
+        router.push('/home');
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.error || 'Failed to save settings.');
+      }
     } catch (error) {
       console.error('Error saving settings:', error);
       Alert.alert('Error', 'Failed to save settings. Please try again.');
@@ -78,88 +135,92 @@ export default function ProfilePage() {
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        {/* Profile Picture */}
-        <View style={styles.profilePictureContainer}>
-          <View style={styles.profilePicture}>
-            <Text style={styles.profilePictureText}>👤</Text>
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <View style={styles.container}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Profile</Text>
+            <View style={{ width: 24 }} />
           </View>
-        </View>
 
-        {/* Settings Form */}
-        <View style={styles.formContainer}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              style={styles.textInput}
-              value={settings.name}
-              onChangeText={(value) => handleSettingChange('name', value)}
-              placeholder="Enter your name"
-              placeholderTextColor="#9CA3AF"
+          {/* Profile Picture */}
+          <View style={styles.profilePictureContainer}>
+            <ProfilePicture 
+              size={96} 
+              editable={true}
             />
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={styles.textInput}
-              value={settings.email}
-              onChangeText={(value) => handleSettingChange('email', value)}
-              placeholder="Enter your email"
-              placeholderTextColor="#9CA3AF"
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-          </View>
-
-          {/* E-Scooter Specific Settings */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>E-Scooter Settings</Text>
-            
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>Push Notifications</Text>
-              <Switch
-                value={settings.notifications}
-                onValueChange={(value) => handleSettingChange('notifications', value)}
-                trackColor={{ false: '#374151', true: '#3B82F6' }}
-                thumbColor={settings.notifications ? '#FFFFFF' : '#9CA3AF'}
+          {/* Settings Form */}
+          <View style={styles.formContainer}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Name</Text>
+              <TextInput
+                style={styles.textInput}
+                value={settings.name}
+                onChangeText={(value) => handleSettingChange('name', value)}
+                placeholder="Enter your name"
+                placeholderTextColor="#9CA3AF"
               />
             </View>
 
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>Location Sharing</Text>
-              <Switch
-                value={settings.locationSharing}
-                onValueChange={(value) => handleSettingChange('locationSharing', value)}
-                trackColor={{ false: '#374151', true: '#3B82F6' }}
-                thumbColor={settings.locationSharing ? '#FFFFFF' : '#9CA3AF'}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={styles.textInput}
+                value={settings.email}
+                onChangeText={(value) => handleSettingChange('email', value)}
+                placeholder="Enter your email"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="email-address"
+                autoCapitalize="none"
               />
             </View>
-          </View>
 
-          {/* Action Buttons */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSaveSettings}>
-              <Text style={styles.saveButtonText}>Save Settings</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Text style={styles.logoutButtonText}>Logout</Text>
-            </TouchableOpacity>
+            {/* E-Scooter Specific Settings */}
+            <View style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>E-Scooter Settings</Text>
+              
+              <View style={styles.switchContainer}>
+                <Text style={styles.switchLabel}>Push Notifications</Text>
+                <Switch
+                  value={settings.notifications}
+                  onValueChange={(value) => handleSettingChange('notifications', value)}
+                  trackColor={{ false: '#374151', true: '#22C55D' }}
+                  thumbColor={settings.notifications ? '#FFFFFF' : '#9CA3AF'}
+                />
+              </View>
+
+              <View style={styles.switchContainer}>
+                <Text style={styles.switchLabel}>Location Sharing</Text>
+                <Switch
+                  value={settings.locationSharing}
+                  onValueChange={(value) => handleSettingChange('locationSharing', value)}
+                  trackColor={{ false: '#374151', true: '#22C55D' }}
+                  thumbColor={settings.locationSharing ? '#FFFFFF' : '#9CA3AF'}
+                />
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSaveSettings}>
+                <Text style={styles.saveButtonText}>Save Settings</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </View>
+        </ScrollView>
+      </View>
+    </>
   );
 }
 
@@ -189,19 +250,6 @@ const styles = StyleSheet.create({
   profilePictureContainer: {
     alignItems: 'center',
     paddingVertical: 32,
-  },
-  profilePicture: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#374151',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: '#3B82F6',
-  },
-  profilePictureText: {
-    fontSize: 48,
   },
   formContainer: {
     paddingHorizontal: 16,

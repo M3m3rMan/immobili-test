@@ -472,7 +472,11 @@ export default function Community() {
             <View key={post._id || index} style={styles.postContainer}>
               <View style={styles.postHeader}>
                 <View style={styles.userInfo}>
-                  <Text style={styles.avatar}>{post.avatar || '🛴'}</Text>
+                  {post.avatar && post.avatar !== '👤' ? (
+                    <Image source={{ uri: post.avatar }} style={styles.avatarImage} />
+                  ) : (
+                    <Text style={styles.avatar}>{post.avatar || '🛴'}</Text>
+                  )}
                   <View>
                     <Text style={styles.username}>{post.username || 'Anonymous'}</Text>
                     <Text style={styles.timestamp}>{formatTimeAgo(post.timestamp)}</Text>
@@ -681,6 +685,13 @@ const styles = StyleSheet.create({
   avatar: {
     fontSize: 24,
     marginRight: 12,
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: '#374151',
   },
   username: {
     fontSize: 16,

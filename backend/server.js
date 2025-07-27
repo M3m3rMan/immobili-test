@@ -30,6 +30,8 @@ const UserSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   phone: { type: String, required: true },
   password: { type: String, required: true }, // For production, hash this!
+  email: { type: String, default: null }, // Add email field
+  profilePicture: { type: String, default: null }, // Store image URI
 });
 const User = mongoose.model('User', UserSchema);
 
@@ -648,6 +650,89 @@ app.post('/api/register', express.json(), async (req, res) => {
   }
 });
 
+// Update profile picture endpoint
+app.post('/api/update-profile-picture', express.json(), async (req, res) => {
+  try {
+    const { userId, profilePicture } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { profilePicture },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Profile picture updated successfully', user });
+  } catch (err) {
+    console.error('Error updating profile picture:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get user profile endpoint
+app.get('/api/user-profile/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const user = await User.findById(userId).select('-password'); // Exclude password
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user });
+  } catch (err) {
+    console.error('Error fetching user profile:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Update user profile endpoint (username and email)
+app.post('/api/update-user-profile', express.json(), async (req, res) => {
+  try {
+    const { userId, username, email } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Check if username is being changed and if it's already taken
+    if (username) {
+      const existingUser = await User.findOne({ username, _id: { $ne: userId } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'Username is already taken' });
+      }
+    }
+
+    // Update user profile
+    const updateData = {};
+    if (username) updateData.username = username;
+    if (email !== undefined) updateData.email = email; // Allow setting email to empty string
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Profile updated successfully', user });
+  } catch (err) {
+    console.error('Error updating user profile:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 
 // Community Posts endpoints
 app.post('/api/community-posts', express.json(), async (req, res) => {
@@ -658,7 +743,7 @@ app.post('/api/community-posts', express.json(), async (req, res) => {
       return res.status(400).json({ error: 'Text and userId are required' });
     }
 
-    // Get user information to include username
+    // Get user information to include username and profile picture
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
@@ -669,7 +754,7 @@ app.post('/api/community-posts', express.json(), async (req, res) => {
       text,
       image: image || undefined,
       userId,
-      avatar: '👤', // Default avatar
+      avatar: user.profilePicture || '👤', // Use user's profile picture or default avatar
       location: 'Your Location' // You can make this dynamic later
     });
 
@@ -685,10 +770,16 @@ app.get('/api/community-posts', async (req, res) => {
   try {
     const posts = await CommunityPost.find()
       .sort({ timestamp: -1 }) // Most recent first
-      .populate('userId', 'username') // Include username from user
+      .populate('userId', 'username profilePicture') // Include username and profile picture from user
       .lean();
 
-    res.json({ posts });
+    // Update avatar field with user's profile picture if available
+    const postsWithProfilePictures = posts.map(post => ({
+      ...post,
+      avatar: post.userId?.profilePicture || post.avatar || '👤'
+    }));
+
+    res.json({ posts: postsWithProfilePictures });
   } catch (err) {
     console.error('Error fetching posts:', err);
     res.status(500).json({ error: 'Server error' });

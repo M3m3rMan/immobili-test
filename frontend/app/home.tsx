@@ -10,6 +10,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useRouter } from "expo-router";
+import ProfilePicture from "@/components/ProfilePicture";
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -33,12 +34,15 @@ const ScooterDashboard: React.FC = () => {
               <Text style={styles.statusText}>Available</Text>
             </View>
           </View>
-          <Image
-            source={{
-              uri: "https://api.builder.io/api/v1/image/assets/TEMP/91972ddee7f73ce465849bf6f128876ac2787206?width=114",
-            }}
-            style={styles.profileImage}
-          />
+          <TouchableOpacity
+            onPress={() => router.push("/profile")}
+            activeOpacity={0.8}
+          >
+            <ProfilePicture 
+              size={60} 
+              editable={false}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Main scooter image */}
@@ -166,16 +170,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter",
     lineHeight: 20,
     letterSpacing: -0.32,
-  },
-  profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    shadowColor: "rgba(0, 0, 0, 0.25)",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 4,
-    elevation: 4,
   },
   scooterContainer: {
     alignItems: "center",
