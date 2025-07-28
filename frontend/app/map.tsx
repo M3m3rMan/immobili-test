@@ -579,16 +579,31 @@ const MapScreen: React.FC = () => {
       const geocodeData = await reverseGeocode.json();
       
       let locationName = 'Selected Location';
-      if (geocodeData.results && geocodeData.results.length > 0) {
-        // Try to get a business name or point of interest
-        const result = geocodeData.results.find((r: any) => 
-          r.types.includes('establishment') || 
-          r.types.includes('point_of_interest') ||
-          r.types.includes('store')
-        ) || geocodeData.results[0];
-        
-        locationName = result.name || result.formatted_address || 'Selected Location';
-      }
+       if (geocodeData.results && geocodeData.results.length > 0) {
+         // Try to get a business name or point of interest
+         const businessResult = geocodeData.results.find((r: any) => 
+           r.types.includes('establishment') || 
+           r.types.includes('point_of_interest') ||
+           r.types.includes('store')
+         );
+         
+         // Get the address result (usually the first one)
+         const addressResult = geocodeData.results[0];
+         
+         if (businessResult && businessResult.name) {
+           // If we have a business name, combine it with the address
+           const businessName = businessResult.name;
+           const address = addressResult.formatted_address || businessResult.formatted_address;
+           
+           // Extract street address (remove city, state, zip)
+           const streetAddress = address.split(',')[0];
+           
+           locationName = `${streetAddress} (Also known as: ${businessName})`;
+         } else {
+           // Just use the formatted address
+           locationName = addressResult.formatted_address || 'Selected Location';
+         }
+       }
       
       // Show confirmation with visual feedback
       Alert.alert(
