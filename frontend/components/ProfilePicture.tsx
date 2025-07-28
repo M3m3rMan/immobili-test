@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   imageContainer: {
     borderWidth: 4,
-    borderColor: '#22C55D',
+    borderColor: '#3B82F6',
     overflow: 'hidden',
     aspectRatio: 1, // Ensures perfect square border container
     width: '100%',
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   editIcon: {
-    backgroundColor: '#22C55D',
+    backgroundColor: '#3B82F6',
     borderRadius: 10,
     padding: 4,
   },
