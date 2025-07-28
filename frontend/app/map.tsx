@@ -568,6 +568,40 @@ const MapScreen: React.FC = () => {
     );
   };
 
+  // Helper function to calculate distance between two coordinates in meters
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371e3; // Earth's radius in meters
+    const φ1 = lat1 * Math.PI/180; // φ, λ in radians
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+              Math.cos(φ1) * Math.cos(φ2) *
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // Distance in meters
+  };
+
+  // Function to check safety level based on proximity to safety zones
+  const getSafetyLevel = (latitude: number, longitude: number): string => {
+    const SAFE_DISTANCE = 100; // 100 meters
+    const LOW_RISK_DISTANCE = 200; // 200 meters
+    
+    for (const zone of safetyZones) {
+      const distance = calculateDistance(latitude, longitude, zone.latitude, zone.longitude);
+      
+      if (distance <= SAFE_DISTANCE) {
+        return 'Safe';
+      } else if (distance <= LOW_RISK_DISTANCE) {
+        return 'Low Risk';
+      }
+    }
+    
+    return ''; // No safety level if not near any safety zones
+  };
+
   const handleMapPress = async (coordinate: { latitude: number; longitude: number }) => {
     console.log('Map tapped at:', coordinate);
     
@@ -605,84 +639,67 @@ const MapScreen: React.FC = () => {
          }
        }
       
-      // Show confirmation with visual feedback
-      Alert.alert(
-        'Set Destination',
-        `Would you like to navigate to ${locationName}?`,
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Yes',
-            onPress: async () => {
-              setIsAnalyzing(true);
-              
-              try {
-                const destination: Destination = {
-                  latitude: coordinate.latitude,
-                  longitude: coordinate.longitude,
-                  name: locationName
-                };
-                
-                // Update the destination input to show the selected location
-                setDestinationInput(locationName);
-                setDestination(destination);
-                setShowDirections(true);
-                
-                // Analyze the route
-                await analyzeRoute(destination);
-                
-                console.log(`Set destination to: ${locationName} at (${coordinate.latitude}, ${coordinate.longitude})`);
-              } catch (error) {
-                console.error('Error setting map destination:', error);
-                Alert.alert('Error', 'Failed to set destination. Please try again.');
-                setIsAnalyzing(false);
-              }
-            },
-          },
-        ]
-      );
+      // Check safety level based on proximity to safety zones
+      const safetyLevel = getSafetyLevel(coordinate.latitude, coordinate.longitude);
+      if (safetyLevel) {
+        locationName = `${locationName} [${safetyLevel}]`;
+      }
+      
+      // Directly set the destination without confirmation
+      setIsAnalyzing(true);
+      
+      try {
+        const destination: Destination = {
+          latitude: coordinate.latitude,
+          longitude: coordinate.longitude,
+          name: locationName
+        };
+        
+        // Update the destination input to show the selected location
+        setDestinationInput(locationName);
+        setDestination(destination);
+        setShowDirections(true);
+        
+        // Analyze the route
+        await analyzeRoute(destination);
+        
+        console.log(`Set destination to: ${locationName} at (${coordinate.latitude}, ${coordinate.longitude})`);
+      } catch (error) {
+        console.error('Error setting map destination:', error);
+        Alert.alert('Error', 'Failed to set destination. Please try again.');
+        setIsAnalyzing(false);
+      }
     } catch (error) {
       console.error('Error with reverse geocoding:', error);
-      // Fallback without geocoding
-      Alert.alert(
-        'Set Destination',
-        'Would you like to navigate to this location?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Yes',
-            onPress: async () => {
-              setIsAnalyzing(true);
-              
-              try {
-                const destination: Destination = {
-                  latitude: coordinate.latitude,
-                  longitude: coordinate.longitude,
-                  name: 'Selected Location'
-                };
-                
-                setDestinationInput('Selected Location');
-                setDestination(destination);
-                setShowDirections(true);
-                
-                await analyzeRoute(destination);
-                
-                console.log(`Set destination to selected location at (${coordinate.latitude}, ${coordinate.longitude})`);
-              } catch (error) {
-                console.error('Error setting destination:', error);
-                Alert.alert('Error', 'Failed to set destination. Please try again.');
-                setIsAnalyzing(false);
-              }
-            },
-          },
-        ]
-      );
+      // Fallback without geocoding - directly set destination
+      setIsAnalyzing(true);
+      
+      // Check safety level for fallback case
+      let fallbackLocationName = 'Selected Location';
+      const safetyLevel = getSafetyLevel(coordinate.latitude, coordinate.longitude);
+      if (safetyLevel) {
+        fallbackLocationName = `Selected Location [${safetyLevel}]`;
+      }
+      
+      try {
+        const destination: Destination = {
+          latitude: coordinate.latitude,
+          longitude: coordinate.longitude,
+          name: fallbackLocationName
+        };
+        
+        setDestinationInput(fallbackLocationName);
+        setDestination(destination);
+        setShowDirections(true);
+        
+        await analyzeRoute(destination);
+        
+        console.log(`Set destination to selected location at (${coordinate.latitude}, ${coordinate.longitude})`);
+      } catch (error) {
+        console.error('Error setting destination:', error);
+        Alert.alert('Error', 'Failed to set destination. Please try again.');
+        setIsAnalyzing(false);
+      }
     }
   };
 
