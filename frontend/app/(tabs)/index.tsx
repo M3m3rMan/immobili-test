@@ -50,7 +50,7 @@ export default function LoginScreen() {
         console.log('Login successful, User ID:', data.userId);
         await AsyncStorage.setItem('userId', data.userId);
         await AsyncStorage.setItem('username', username);
-        router.replace('/home');
+        router.replace('/map');
       } else {
         Alert.alert('Error', data.error || 'Login failed');
       }

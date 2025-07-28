@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Image, Text, StyleSheet, Pressable, TextInput, ScrollView, Animated, Alert, Platform, TouchableOpacity, Dimensions, KeyboardAvoidingView, Keyboard } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import ProfilePicture from '../components/ProfilePicture';
 
 const { width, height } = Dimensions.get('window');
 
@@ -394,6 +395,8 @@ const MapScreen: React.FC = () => {
         
         setUserLocation(currentLocation);
         console.log('User location:', currentLocation);
+        
+        // Show a toast notification about the POI feature
       } catch (error) {
         console.log('Error getting location:', error);
         Alert.alert('Location Error', 'Could not get your current location. Using USC as default.');
@@ -519,8 +522,153 @@ const MapScreen: React.FC = () => {
     });
   };
 
-  const handleBackPress = () => {
-    router.back();
+  const handlePoiClick = async (event: any) => {
+    const { coordinate, name, placeId } = event.nativeEvent;
+    
+    console.log('POI clicked:', { name, coordinate, placeId });
+    
+    // Show a confirmation alert with the POI name
+    Alert.alert(
+      'Set Destination',
+      `Would you like to navigate to ${name}?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes',
+          onPress: async () => {
+            setIsAnalyzing(true);
+            
+            try {
+              const destination: Destination = {
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                name: name || 'Selected Location'
+              };
+              
+              // Update the destination input to show the selected POI
+              setDestinationInput(name || 'Selected Location');
+              setDestination(destination);
+              setShowDirections(true);
+              
+              // Analyze the route
+              await analyzeRoute(destination);
+              
+              console.log(`Set destination to POI: ${name} at (${coordinate.latitude}, ${coordinate.longitude})`);
+            } catch (error) {
+              console.error('Error setting POI destination:', error);
+              Alert.alert('Error', 'Failed to set destination. Please try again.');
+              setIsAnalyzing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleMapPress = async (coordinate: { latitude: number; longitude: number }) => {
+    console.log('Map tapped at:', coordinate);
+    
+    try {
+      // Use reverse geocoding to get a readable location name
+      const reverseGeocode = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_APIKEY}`
+      );
+      const geocodeData = await reverseGeocode.json();
+      
+      let locationName = 'Selected Location';
+      if (geocodeData.results && geocodeData.results.length > 0) {
+        // Try to get a business name or point of interest
+        const result = geocodeData.results.find((r: any) => 
+          r.types.includes('establishment') || 
+          r.types.includes('point_of_interest') ||
+          r.types.includes('store')
+        ) || geocodeData.results[0];
+        
+        locationName = result.name || result.formatted_address || 'Selected Location';
+      }
+      
+      // Show confirmation with visual feedback
+      Alert.alert(
+        'Set Destination',
+        `Would you like to navigate to ${locationName}?`,
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes',
+            onPress: async () => {
+              setIsAnalyzing(true);
+              
+              try {
+                const destination: Destination = {
+                  latitude: coordinate.latitude,
+                  longitude: coordinate.longitude,
+                  name: locationName
+                };
+                
+                // Update the destination input to show the selected location
+                setDestinationInput(locationName);
+                setDestination(destination);
+                setShowDirections(true);
+                
+                // Analyze the route
+                await analyzeRoute(destination);
+                
+                console.log(`Set destination to: ${locationName} at (${coordinate.latitude}, ${coordinate.longitude})`);
+              } catch (error) {
+                console.error('Error setting map destination:', error);
+                Alert.alert('Error', 'Failed to set destination. Please try again.');
+                setIsAnalyzing(false);
+              }
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error with reverse geocoding:', error);
+      // Fallback without geocoding
+      Alert.alert(
+        'Set Destination',
+        'Would you like to navigate to this location?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Yes',
+            onPress: async () => {
+              setIsAnalyzing(true);
+              
+              try {
+                const destination: Destination = {
+                  latitude: coordinate.latitude,
+                  longitude: coordinate.longitude,
+                  name: 'Selected Location'
+                };
+                
+                setDestinationInput('Selected Location');
+                setDestination(destination);
+                setShowDirections(true);
+                
+                await analyzeRoute(destination);
+                
+                console.log(`Set destination to selected location at (${coordinate.latitude}, ${coordinate.longitude})`);
+              } catch (error) {
+                console.error('Error setting destination:', error);
+                Alert.alert('Error', 'Failed to set destination. Please try again.');
+                setIsAnalyzing(false);
+              }
+            },
+          },
+        ]
+      );
+    }
   };
 
   const handleSetDestination = async () => {
@@ -731,14 +879,25 @@ const getSafetyColor = (safetyLevel: string) => {
     >
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={handleBackPress}>
-          <Text style={styles.backArrow}>←</Text>
-        </Pressable>
-        <View style={styles.headerContent}>
-          {/* Debug info - remove this later */}
-          <Text style={{color: 'white', fontSize: 12}}>
-            Reports: {reports.length} | Safety: {safetyZones.length}
-          </Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.appTitle}>IMMOBILI</Text>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.navButton} 
+            onPress={() => router.push('/report')}
+          >
+            <Ionicons name="warning" size={28} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.navButton} 
+            onPress={() => router.push('/community')}
+          >
+            <Ionicons name="people" size={28} color="#fff" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/profile')}>
+            <ProfilePicture size={40} editable={false} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -762,12 +921,21 @@ const getSafetyColor = (safetyLevel: string) => {
         zoomTapEnabled={true}
         zoomControlEnabled={true}
         moveOnMarkerPress={false}
-        onPress={() => {
+        showsPointsOfInterest={true}
+        onPoiClick={handlePoiClick}
+        onPress={(event: any) => {
           // Dismiss keyboard when tapping on map
           Keyboard.dismiss();
           // Dismiss bottom panel if it's showing
           if (showDetails) {
             handleCloseDetails();
+            return;
+          }
+          
+          // Handle map tap for location selection
+          const coordinate = event.nativeEvent.coordinate;
+          if (coordinate) {
+            handleMapPress(coordinate);
           }
         }}
       >
@@ -942,34 +1110,40 @@ const getSafetyColor = (safetyLevel: string) => {
               </TouchableOpacity>
             </View>
             
-            <View style={styles.safetyLevelContainer}>
-              <Text style={styles.safetyLevelLabel}>Safety Level:</Text>
-              <Text style={[styles.safetyLevelValue, { color: getSafetyColor(routeAnalysis.safetyLevel) }]}>
-                {routeAnalysis.safetyLevel}
-              </Text>
-            </View>
-            
-            <MarkdownText text={routeAnalysis.analysis} />
-            
-            <Text style={styles.nearbyTheftsText}>
-              Nearby theft reports: {routeAnalysis.nearbyThefts}
-            </Text>
-            
-            {routeAnalysis.safeAlternatives.length > 0 && (
-              <View style={styles.alternativesSection}>
-                <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
-                {routeAnalysis.safeAlternatives.slice(0, 3).map((alt, index) => (
-                  <TouchableOpacity 
-                    key={index} 
-                    style={styles.alternativeItem}
-                    onPress={() => handleSafeAlternativePress(alt)}
-                  >
-                    <Text style={styles.alternativeName}>{alt.name}</Text>
-                    <Text style={styles.alternativeScore}>Safety: {alt.safetyScore}/10</Text>
-                  </TouchableOpacity>
-                ))}
+            <ScrollView 
+              style={styles.routeAnalysisScroll}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+            >
+              <View style={styles.safetyLevelContainer}>
+                <Text style={styles.safetyLevelLabel}>Safety Level:</Text>
+                <Text style={[styles.safetyLevelValue, { color: getSafetyColor(routeAnalysis.safetyLevel) }]}>
+                  {routeAnalysis.safetyLevel}
+                </Text>
               </View>
-            )}
+              
+              <MarkdownText text={routeAnalysis.analysis} />
+              
+              <Text style={styles.nearbyTheftsText}>
+                Nearby theft reports: {routeAnalysis.nearbyThefts}
+              </Text>
+              
+              {routeAnalysis.safeAlternatives.length > 0 && (
+                <View style={styles.alternativesSection}>
+                  <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
+                  {routeAnalysis.safeAlternatives.map((alt, index) => (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={styles.alternativeItem}
+                      onPress={() => handleSafeAlternativePress(alt)}
+                    >
+                      <Text style={styles.alternativeName}>{alt.name}</Text>
+                      <Text style={styles.alternativeScore}>Safety: {alt.safetyScore}/10</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
           </View>
         )}
       </Animated.View>
@@ -1218,8 +1392,39 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     zIndex: 10,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 15,
+  },
+  appTitle: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  navButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   backButton: {
     width: 40,
@@ -1558,6 +1763,9 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     maxHeight: height * 0.3,
+  },
+  routeAnalysisScroll: {
+    maxHeight: height * 0.2,
   },
   routeAnalysisHeader: {
     flexDirection: 'row',
