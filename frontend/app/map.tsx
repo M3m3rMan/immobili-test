@@ -11,6 +11,7 @@ const { width, height } = Dimensions.get('window');
 let Location: any = null;
 let MapView: any = null;
 let Marker: any = null;
+let Callout: any = null;
 let MapViewDirections: any = null;
 
 if (Platform.OS !== 'web') {
@@ -19,6 +20,7 @@ if (Platform.OS !== 'web') {
     const mapModule = require('react-native-maps');
     MapView = mapModule.default;
     Marker = mapModule.Marker;
+    Callout = mapModule.Callout;
     MapViewDirections = require('react-native-maps-directions').default;
   } catch (error) {
     console.log('Maps not available on this platform');
@@ -309,6 +311,7 @@ const MapScreen: React.FC = () => {
   const [showDirections, setShowDirections] = useState(false);
   const [routeAnalysis, setRouteAnalysis] = useState<RouteAnalysis | null>(null);
   const [safeAlternatives, setSafeAlternatives] = useState<SafeAlternative[]>([]);
+  const [showSafeAlternatives, setShowSafeAlternatives] = useState(false);
   const [showRouteAnalysis, setShowRouteAnalysis] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const slideAnim = useState(new Animated.Value(300))[0];
@@ -555,15 +558,65 @@ const MapScreen: React.FC = () => {
 
   const handleSafeAlternativePress = (alternative: SafeAlternative) => {
     setIsMarkerPressed(true);
-    setSafeAlternative(alternative);
-    setSelectedReport(null);
-    setSelectedSafetyZone(null);
-    setShowDetails(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
+    
+    // Show confirmation dialog to replace current destination
+    Alert.alert(
+      'Use Safe Alternative',
+      `Would you like to navigate to ${alternative.name} instead? This is a safer parking option.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+          onPress: () => {
+            // Just show details without changing destination
+            setSafeAlternative(alternative);
+            setSelectedReport(null);
+            setSelectedSafetyZone(null);
+            setShowDetails(true);
+            Animated.timing(slideAnim, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+        {
+          text: 'Navigate Here',
+          onPress: async () => {
+            // Replace current destination with the safe alternative
+            setIsAnalyzing(true);
+            
+            try {
+              const newDestination: Destination = {
+                latitude: alternative.latitude,
+                longitude: alternative.longitude,
+                name: alternative.name
+              };
+              
+              // Clear current route and alternatives
+              setDestination(null);
+              setShowDirections(false);
+              setSafeAlternatives([]);
+              setShowRouteAnalysis(false);
+              
+              // Set new destination
+              setDestinationInput(alternative.name);
+              setDestination(newDestination);
+              setShowDirections(true);
+              
+              // Analyze the new route
+              await analyzeRoute(newDestination);
+              
+              console.log(`Switched to safe alternative: ${alternative.name}`);
+            } catch (error) {
+              console.error('Error switching to safe alternative:', error);
+              Alert.alert('Error', 'Failed to set new destination. Please try again.');
+              setIsAnalyzing(false);
+            }
+          }
+        }
+      ]
+    );
     
     // Reset the flag after a short delay
     setTimeout(() => setIsMarkerPressed(false), 100);
@@ -664,6 +717,9 @@ const MapScreen: React.FC = () => {
 
   const handleMapPress = async (coordinate: { latitude: number; longitude: number }) => {
     console.log('Map tapped at:', coordinate);
+    
+    // Clear any existing route first
+    clearRoute();
     
     try {
       // Use reverse geocoding to get a readable location name
@@ -866,6 +922,7 @@ const MapScreen: React.FC = () => {
     setShowDirections(false);
     setRouteAnalysis(null);
     setSafeAlternatives([]);
+    setShowSafeAlternatives(false);
     setShowRouteAnalysis(false);
     setDestinationInput('');
     setIsAnalyzing(false);
@@ -1098,8 +1155,8 @@ const getSafetyColor = (safetyLevel: string) => {
           );
         })}
 
-        {/* Green markers for safe alternatives */}
-        {safeAlternatives.map((alternative, index) => (
+        {/* Green markers for safe alternatives - only show when explicitly enabled */}
+        {showSafeAlternatives && safeAlternatives.map((alternative, index) => (
           <Marker
             key={`alternative-${alternative.name}-${index}`}
             coordinate={{
@@ -1254,7 +1311,17 @@ const getSafetyColor = (safetyLevel: string) => {
                   
                   {routeAnalysis.safeAlternatives.length > 0 && (
                     <View style={styles.alternativesSection}>
-                      <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
+                      <View style={styles.alternativesHeader}>
+                        <Text style={styles.alternativesTitle}>Safer Alternatives ({routeAnalysis.safeAlternatives.length})</Text>
+                        <TouchableOpacity 
+                          style={styles.showAlternativesButton}
+                          onPress={() => setShowSafeAlternatives(!showSafeAlternatives)}
+                        >
+                          <Text style={styles.showAlternativesText}>
+                            {showSafeAlternatives ? 'Hide on Map' : 'Show on Map'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                       {routeAnalysis.safeAlternatives.map((alt, index) => (
                         <TouchableOpacity 
                           key={index} 
@@ -2071,7 +2138,21 @@ const styles = StyleSheet.create({
   alternativesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 12,
+  },
+  showAlternativesButton: {
+    backgroundColor: 'rgba(48, 209, 88, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#30D158',
+  },
+  showAlternativesText: {
+    color: '#30D158',
+    fontSize: 12,
+    fontWeight: '600',
   },
   alternativesIcon: {
     fontSize: 16,
@@ -2165,6 +2246,33 @@ const styles = StyleSheet.create({
   sectionIcon: {
     fontSize: 18,
     marginRight: 8,
+  },
+  
+  // Callout styles for safe alternatives
+  calloutContainer: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 8,
+    padding: 12,
+    minWidth: 150,
+    maxWidth: 200,
+    borderWidth: 1,
+    borderColor: 'rgba(48, 209, 88, 0.3)',
+  },
+  calloutTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  calloutSubtitle: {
+    color: '#30D158',
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  calloutDistance: {
+    color: '#8E8E93',
+    fontSize: 11,
   },
 });
 
