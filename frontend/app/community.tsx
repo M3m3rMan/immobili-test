@@ -11,9 +11,10 @@ import {
   Modal,
   Dimensions,
   Platform,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
@@ -29,7 +30,7 @@ const SAMPLE_POSTS: CommunityPost[] = [
     username: 'ScooterRider23',
     avatar: '🛴',
     text: 'Just found an amazing new route through campus! Perfect for avoiding the busy streets. Anyone want to join me tomorrow?',
-    image: 'httpss://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
+    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
     timestamp: '2h ago',
     likes: 12,
     comments: 3,
@@ -71,6 +72,7 @@ export default function Community() {
   const [cameraPermission, setCameraPermission] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [postsLoading, setPostsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [userDataLoading, setUserDataLoading] = useState(true); // Add user data loading state
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -84,6 +86,15 @@ export default function Community() {
     loadUserData();
     fetchPosts();
   }, []);
+
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Community screen focused - refreshing data');
+      loadUserData();
+      fetchPosts();
+    }, [])
+  );
 
   // Debug useEffect to// Track username state changes
   useEffect(() => {
@@ -111,39 +122,62 @@ export default function Community() {
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    console.log('🔄 Pull to refresh triggered');
+    try {
+      await Promise.all([loadUserData(), fetchPosts()]);
+    } catch (error) {
+      console.error('❌ Error during refresh:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const fetchPosts = async () => {
     try {
       setPostsLoading(true);
+      console.log('🔄 Fetching posts from backend...');
+      
       const response = await fetch('https://immobili-backend-production.up.railway.app/api/community-posts');
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched posts data:', data);
+        console.log('📥 Fetched posts data:', data);
         
         // The backend returns { posts: [...] }, so we need to access data.posts
         const fetchedPosts = data.posts || [];
+        console.log('📝 Raw fetched posts:', fetchedPosts);
         
         // Process the posts to handle populated user data
-        const processedPosts = fetchedPosts.map((post: any) => ({
-          ...post,
-          // If userId is populated, use the username from the populated user object
-          username: post.userId?.username || post.username || 'Anonymous',
-          timestamp: formatTimeAgo(post.timestamp)
-        }));
+        const processedPosts = fetchedPosts.map((post: any) => {
+          const processedPost = {
+            ...post,
+            // If userId is populated, use the username from the populated user object
+            username: post.userId?.username || post.username || 'Anonymous',
+            // Don't format timestamp here - let the component handle it
+            timestamp: post.timestamp || new Date().toISOString()
+          };
+          console.log('🔄 Processed post:', processedPost);
+          return processedPost;
+        });
         
-        console.log('Processed posts:', processedPosts);
+        console.log('✅ All processed posts:', processedPosts);
         
         // Combine fetched posts with sample posts, ensuring we always have content
+        // Put fetched posts first so they appear at the top
         const allPosts = [...processedPosts, ...SAMPLE_POSTS];
+        console.log('📋 Final posts array:', allPosts);
         setPosts(allPosts);
       } else {
-        console.error('Failed to fetch posts:', response.status);
+        console.error('❌ Failed to fetch posts:', response.status);
         setPosts(SAMPLE_POSTS); // Use sample posts on error
       }
     } catch (error) {
-      console.error('Error fetching posts:', error);
+      console.error('❌ Error fetching posts:', error);
       setPosts(SAMPLE_POSTS); // Use sample posts on error
     } finally {
       setPostsLoading(false);
+      console.log('✅ Posts loading completed');
     }
   };
 
@@ -282,9 +316,6 @@ export default function Community() {
       setNewPostText('');
       setSelectedImage(null);
       setShowCreatePost(false);
-      
-      // Show success message
-      Alert.alert('Success', `Post created as "${finalUsername}"`);
 
       // Try to save to backend
       try {
@@ -304,14 +335,15 @@ export default function Community() {
         if (response.ok) {
           const savedPost = await response.json();
           console.log('💾 Post saved to backend with username:', savedPost.username);
-          // Update the temporary post with the real one from backend
-          setPosts(prevPosts => 
-            prevPosts.map(post => 
-              post._id === newPost._id ? { ...savedPost, timestamp: formatTimeAgo(savedPost.timestamp) } : post
-            )
-          );
+          
+          // Refresh all posts to get the latest data from backend
+          await fetchPosts();
+          
+          // Show success message
+          // Alert.alert('Success', `Post created and saved as "${finalUsername}"`);
         } else {
           console.error('Backend save failed:', await response.text());
+          Alert.alert('Warning', 'Post created locally but failed to save to server.');
         }
       } catch (backendError) {
         console.error('Backend save failed, but post is shown locally:', backendError);
@@ -447,7 +479,19 @@ export default function Community() {
       </View>
 
       {/* Community Feed */}
-      <ScrollView style={styles.feed} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.feed} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#FFFFFF"
+            titleColor="#FFFFFF"
+            title="Pull to refresh"
+          />
+        }
+      >
         <View style={styles.welcomeSection}>
           <Text style={styles.welcomeTitle}>Welcome to the Community! 🛴</Text>
           <Text style={styles.welcomeText}>
