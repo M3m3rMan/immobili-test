@@ -29,7 +29,7 @@ const SAMPLE_POSTS: CommunityPost[] = [
     username: 'ScooterRider23',
     avatar: '🛴',
     text: 'Just found an amazing new route through campus! Perfect for avoiding the busy streets. Anyone want to join me tomorrow?',
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
+    image: 'httpss://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=300&fit=crop',
     timestamp: '2h ago',
     likes: 12,
     comments: 3,
@@ -114,7 +114,7 @@ export default function Community() {
   const fetchPosts = async () => {
     try {
       setPostsLoading(true);
-      const response = await fetch('http://192.168.1.101:3001/api/community-posts');
+      const response = await fetch('https://immobili-backend-production.up.railway.app/api/community-posts');
       if (response.ok) {
         const data = await response.json();
         console.log('Fetched posts data:', data);
@@ -288,7 +288,7 @@ export default function Community() {
 
       // Try to save to backend
       try {
-        const response = await fetch('http://192.168.1.101:3001/api/community-posts', {
+        const response = await fetch('https://immobili-backend-production.up.railway.app/api/community-posts', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -358,7 +358,7 @@ export default function Community() {
 
   const likePost = async (postId: string) => {
     try {
-      const response = await fetch(`http://192.168.1.101:3001/api/community-posts/${postId}/like`, {
+      const response = await fetch(`https://immobili-backend-production.up.railway.app/api/community-posts/${postId}/like`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -400,7 +400,7 @@ export default function Community() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await fetch(`http://192.168.1.101:3001/api/community-posts/${postId}`, {
+              const response = await fetch(`https://immobili-backend-production.up.railway.app/api/community-posts/${postId}`, {
                 method: 'DELETE',
                 headers: {
                   'Content-Type': 'application/json',

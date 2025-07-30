@@ -92,7 +92,7 @@ Contact Info: ${reportData.contactInfo || 'Not provided'}
           { text: 'Cancel', style: 'cancel' },
           {
             text: 'Open LAPD Portal',
-            onPress: () => Linking.openURL('https://www.lapdonline.org/'),
+            onPress: () => Linking.openURL('httpss://www.lapdonline.org/'),
           },
         ]
       );

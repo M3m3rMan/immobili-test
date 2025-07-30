@@ -3,6 +3,7 @@ import { View, Image, Text, StyleSheet, Pressable, TextInput, ScrollView, Animat
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import ProfilePicture from '../components/ProfilePicture';
+import { PanGestureHandler, State, GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const { width, height } = Dimensions.get('window');
 
@@ -316,6 +317,10 @@ const MapScreen: React.FC = () => {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const searchContainerAnim = useRef(new Animated.Value(0)).current;
+  
+  // Bottom sheet expansion state
+  const [isBottomSheetExpanded, setIsBottomSheetExpanded] = useState(false);
+  const bottomSheetAnim = useRef(new Animated.Value(0)).current; // 0 = collapsed, 1 = expanded
 
   // Helper function to get marker icons
   const getMarkerIcon = (type: 'danger' | 'warning' | 'warning-alt' | 'safety' | 'alternative' | 'destination') => {
@@ -414,7 +419,7 @@ const MapScreen: React.FC = () => {
       
       try {
         console.log('Fetching reports from backend...');
-        const res = await fetch('http://192.168.1.101:3001/api/scooter-reports');
+        const res = await fetch('https://immobili-backend-production.up.railway.app/api/scooter-reports');
         const data = await res.json();
         console.log('Backend response:', data);
         
@@ -475,7 +480,51 @@ const MapScreen: React.FC = () => {
     };
   }, []);
 
+  const [isMarkerPressed, setIsMarkerPressed] = useState(false);
+
+  // Bottom sheet pan gesture handler
+  const onPanGestureEvent = (event: any) => {
+    const { translationY, velocityY } = event.nativeEvent;
+    
+    // Only handle upward gestures (negative translationY) to expand
+    // and downward gestures (positive translationY) to collapse
+    if (!isBottomSheetExpanded && translationY < -50) {
+      // Expand the bottom sheet
+      expandBottomSheet();
+    } else if (isBottomSheetExpanded && translationY > 50) {
+      // Collapse the bottom sheet
+      collapseBottomSheet();
+    }
+  };
+
+  const expandBottomSheet = () => {
+    setIsBottomSheetExpanded(true);
+    Animated.timing(bottomSheetAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const collapseBottomSheet = () => {
+    setIsBottomSheetExpanded(false);
+    Animated.timing(bottomSheetAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const toggleBottomSheet = () => {
+    if (isBottomSheetExpanded) {
+      collapseBottomSheet();
+    } else {
+      expandBottomSheet();
+    }
+  };
+
   const handleMarkerPress = (report: TheftReport) => {
+    setIsMarkerPressed(true);
     setSelectedReport(report);
     setSelectedSafetyZone(null);
     setShowDetails(true);
@@ -484,9 +533,13 @@ const MapScreen: React.FC = () => {
       duration: 300,
       useNativeDriver: true,
     }).start();
+    
+    // Reset the flag after a short delay
+    setTimeout(() => setIsMarkerPressed(false), 100);
   };
 
   const handleSafetyZonePress = (zone: SafetyZone) => {
+    setIsMarkerPressed(true);
     setSelectedSafetyZone(zone);
     setSelectedReport(null);
     setShowDetails(true);
@@ -495,9 +548,13 @@ const MapScreen: React.FC = () => {
       duration: 300,
       useNativeDriver: true,
     }).start();
+    
+    // Reset the flag after a short delay
+    setTimeout(() => setIsMarkerPressed(false), 100);
   };
 
   const handleSafeAlternativePress = (alternative: SafeAlternative) => {
+    setIsMarkerPressed(true);
     setSafeAlternative(alternative);
     setSelectedReport(null);
     setSelectedSafetyZone(null);
@@ -507,6 +564,9 @@ const MapScreen: React.FC = () => {
       duration: 300,
       useNativeDriver: true,
     }).start();
+    
+    // Reset the flag after a short delay
+    setTimeout(() => setIsMarkerPressed(false), 100);
   };
 
   const handleCloseDetails = () => {
@@ -608,7 +668,7 @@ const MapScreen: React.FC = () => {
     try {
       // Use reverse geocoding to get a readable location name
       const reverseGeocode = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_APIKEY}`
+        `httpss://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_APIKEY}`
       );
       const geocodeData = await reverseGeocode.json();
       
@@ -739,7 +799,7 @@ const MapScreen: React.FC = () => {
   const geocodeAddress = async (address: string): Promise<Destination | null> => {
     try {
       const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
+        `httpss://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
       );
       
       const data = await response.json();
@@ -771,7 +831,7 @@ const MapScreen: React.FC = () => {
     }
 
     try {
-      const response = await fetch('http://192.168.1.101:3001/api/analyze-route', {
+      const response = await fetch('https://immobili-backend-production.up.railway.app/api/analyze-route', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -904,11 +964,12 @@ const getSafetyColor = (safetyLevel: string) => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={0}
-    >
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardAvoidingView 
+        style={styles.container} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -958,13 +1019,19 @@ const getSafetyColor = (safetyLevel: string) => {
         onPress={(event: any) => {
           // Dismiss keyboard when tapping on map
           Keyboard.dismiss();
+          
+          // If a marker was just pressed, don't handle map press
+          if (isMarkerPressed) {
+            return;
+          }
+          
           // Dismiss bottom panel if it's showing
           if (showDetails) {
             handleCloseDetails();
             return;
           }
           
-          // Handle map tap for location selection
+          // Handle map tap for location selection only if not a marker press
           const coordinate = event.nativeEvent.coordinate;
           if (coordinate) {
             handleMapPress(coordinate);
@@ -1054,6 +1121,11 @@ const getSafetyColor = (safetyLevel: string) => {
               latitude: destination.latitude,
               longitude: destination.longitude,
             }}
+            onPress={() => {
+              setIsMarkerPressed(true);
+              // Just prevent route analysis, don't show details for destination marker
+              setTimeout(() => setIsMarkerPressed(false), 100);
+            }}
             image={getMarkerIcon('destination')}
             pinColor="blue" // Fallback if no custom image
             tracksViewChanges={false} // Prevent unnecessary re-renders
@@ -1083,102 +1155,124 @@ const getSafetyColor = (safetyLevel: string) => {
         )}
       </MapView>
 
-      {/* Bottom container with route planning and search - now animated */}
-      <Animated.View 
-        style={[
-          styles.searchContainer,
-          {
-            transform: [{ translateY: searchContainerAnim }],
-            // Adjust max height when keyboard is visible
-            maxHeight: isKeyboardVisible ? height * 0.4 : height * 0.7,
-          }
-        ]}
-      >
-        <View style={styles.searchHandle} />
-        
-        {/* Route Planning Controls */}
-        <View style={styles.routeInputContainer}>
-          <TextInput
-            style={styles.routeInput}
-            placeholder="Enter destination..."
-            placeholderTextColor="#8E8E93"
-            value={destinationInput}
-            onChangeText={setDestinationInput}
-            onFocus={() => {
-              // Optional: Add any additional focus behavior here
-              console.log('Input focused');
-            }}
-            onBlur={() => {
-              // Optional: Add any additional blur behavior here
-              console.log('Input blurred');
-            }}
-            returnKeyType="search"
-            onSubmitEditing={handleSetDestination}
-          />
-          <TouchableOpacity 
-            style={styles.routeButton} 
-            onPress={handleSetDestination}
-            disabled={isAnalyzing}
+      {/* Bottom container with route planning and search - now animated and expandable */}
+      {!showDetails && (
+        <PanGestureHandler
+          onGestureEvent={onPanGestureEvent}
+          onHandlerStateChange={onPanGestureEvent}
+        >
+          <Animated.View 
+            style={[
+              styles.searchContainer,
+              {
+                transform: [{ translateY: searchContainerAnim }],
+                // Dynamic height based on expansion state
+                maxHeight: isBottomSheetExpanded 
+                  ? height * 0.8 
+                  : (isKeyboardVisible ? height * 0.4 : height * 0.5),
+              }
+            ]}
           >
-            <Text style={styles.routeButtonText}>
-              {isAnalyzing ? 'Analyzing...' : 'GO'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-        
-        {showDirections && (
-          <TouchableOpacity style={styles.clearButton} onPress={clearRoute}>
-            <Text style={styles.clearButtonText}>Clear Route</Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Route Analysis Results */}
-        {showRouteAnalysis && routeAnalysis && (
-          <View style={styles.routeAnalysisResults}>
-            <View style={styles.routeAnalysisHeader}>
-              <Text style={styles.routeAnalysisTitle}>Route Safety Analysis</Text>
-              <TouchableOpacity onPress={() => setShowRouteAnalysis(false)}>
-                <Ionicons name="close" size={24} color="white" />
+            <TouchableOpacity onPress={toggleBottomSheet} style={styles.searchHandleContainer}>
+               <View style={styles.searchHandle} />
+             </TouchableOpacity>
+            
+            {/* Route Planning Controls */}
+            <View style={styles.routeInputContainer}>
+              <TextInput
+                style={styles.routeInput}
+                placeholder="Enter destination..."
+                placeholderTextColor="#8E8E93"
+                value={destinationInput}
+                onChangeText={setDestinationInput}
+                onFocus={() => {
+                  // Optional: Add any additional focus behavior here
+                  console.log('Input focused');
+                }}
+                onBlur={() => {
+                  // Optional: Add any additional blur behavior here
+                  console.log('Input blurred');
+                }}
+                returnKeyType="search"
+                onSubmitEditing={handleSetDestination}
+              />
+              <TouchableOpacity 
+                style={styles.routeButton} 
+                onPress={handleSetDestination}
+                disabled={isAnalyzing}
+              >
+                <Text style={styles.routeButtonText}>
+                  {isAnalyzing ? 'Analyzing...' : 'GO'}
+                </Text>
               </TouchableOpacity>
             </View>
             
-            <ScrollView 
-              style={styles.routeAnalysisScroll}
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled={true}
-            >
-              <View style={styles.safetyLevelContainer}>
-                <Text style={styles.safetyLevelLabel}>Safety Level:</Text>
-                <Text style={[styles.safetyLevelValue, { color: getSafetyColor(routeAnalysis.safetyLevel) }]}>
-                  {routeAnalysis.safetyLevel}
-                </Text>
-              </View>
-              
-              <MarkdownText text={routeAnalysis.analysis} />
-              
-              <Text style={styles.nearbyTheftsText}>
-                Nearby theft reports: {routeAnalysis.nearbyThefts}
-              </Text>
-              
-              {routeAnalysis.safeAlternatives.length > 0 && (
-                <View style={styles.alternativesSection}>
-                  <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
-                  {routeAnalysis.safeAlternatives.map((alt, index) => (
-                    <TouchableOpacity 
-                      key={index} 
-                      style={styles.alternativeItem}
-                      onPress={() => handleSafeAlternativePress(alt)}
-                    >
-                      <Text style={styles.alternativeName}>{alt.name}</Text>
-                      <Text style={styles.alternativeScore}>Safety: {alt.safetyScore}/10</Text>
-                    </TouchableOpacity>
-                  ))}
+            {showDirections && (
+              <TouchableOpacity style={styles.clearButton} onPress={clearRoute}>
+                <Text style={styles.clearButtonText}>Clear Route</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Route Analysis Results */}
+            {showRouteAnalysis && routeAnalysis && (
+              <Animated.View 
+                style={[
+                  styles.routeAnalysisResults,
+                  {
+                    opacity: bottomSheetAnim,
+                    maxHeight: bottomSheetAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [200, height * 0.6],
+                    }),
+                  }
+                ]}
+              >
+                <View style={styles.routeAnalysisHeader}>
+                  <Text style={styles.routeAnalysisTitle}>Route Safety Analysis</Text>
+                  <TouchableOpacity onPress={() => setShowRouteAnalysis(false)}>
+                    <Ionicons name="close" size={24} color="white" />
+                  </TouchableOpacity>
                 </View>
-              )}
-            </ScrollView>
-          </View>
-        )}
-      </Animated.View>
+                
+                <ScrollView 
+                  style={styles.routeAnalysisScroll}
+                  showsVerticalScrollIndicator={false}
+                  nestedScrollEnabled={true}
+                >
+                  <View style={styles.safetyLevelContainer}>
+                    <Text style={styles.safetyLevelLabel}>Safety Level:</Text>
+                    <Text style={[styles.safetyLevelValue, { color: getSafetyColor(routeAnalysis.safetyLevel) }]}>
+                      {routeAnalysis.safetyLevel}
+                    </Text>
+                  </View>
+                  
+                  <MarkdownText text={routeAnalysis.analysis} />
+                  
+                  <Text style={styles.nearbyTheftsText}>
+                    Nearby theft reports: {routeAnalysis.nearbyThefts}
+                  </Text>
+                  
+                  {routeAnalysis.safeAlternatives.length > 0 && (
+                    <View style={styles.alternativesSection}>
+                      <Text style={styles.alternativesTitle}>Safer Alternatives:</Text>
+                      {routeAnalysis.safeAlternatives.map((alt, index) => (
+                        <TouchableOpacity 
+                          key={index} 
+                          style={styles.alternativeItem}
+                          onPress={() => handleSafeAlternativePress(alt)}
+                        >
+                          <Text style={styles.alternativeName}>{alt.name}</Text>
+                          <Text style={styles.alternativeScore}>Safety: {alt.safetyScore}/10</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                </ScrollView>
+              </Animated.View>
+            )}
+          </Animated.View>
+        </PanGestureHandler>
+      )}
 
       {/* Report details modal - Citizen app style */}
       {showDetails && selectedReport && (
@@ -1406,6 +1500,7 @@ const getSafetyColor = (safetyLevel: string) => {
         </Animated.View>
       )}
     </KeyboardAvoidingView>
+    </GestureHandlerRootView>
   );
 };
 
@@ -1504,6 +1599,11 @@ const styles = StyleSheet.create({
     paddingBottom: 34,
     paddingHorizontal: 16,
     maxHeight: height * 0.7,
+  },
+  searchHandleContainer: {
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchHandle: {
     width: 36,

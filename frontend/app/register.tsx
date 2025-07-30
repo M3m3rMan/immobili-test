@@ -44,7 +44,7 @@ export default function RegisterScreen() {
     
     try {
       // Updated to use the correct backend URL
-      const res = await fetch('http://192.168.1.101:3001/api/register', {
+      const res = await fetch('https://immobili-backend-production.up.railway.app/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, phone, password }),

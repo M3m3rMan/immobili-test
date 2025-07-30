@@ -42,7 +42,7 @@ export default function ProfilePage() {
       // Then load from backend to get the most up-to-date data
       const userId = await AsyncStorage.getItem('userId');
       if (userId) {
-        const response = await fetch(`http://192.168.1.101:3001/api/user-profile/${userId}`);
+        const response = await fetch(`https://immobili-backend-production.up.railway.app/api/user-profile/${userId}`);
         if (response.ok) {
           const userData = await response.json();
           const user = userData.user;
@@ -81,7 +81,7 @@ export default function ProfilePage() {
       }
 
       // Update backend first
-      const response = await fetch('http://192.168.1.101:3001/api/update-user-profile', {
+      const response = await fetch('https://immobili-backend-production.up.railway.app/api/update-user-profile', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

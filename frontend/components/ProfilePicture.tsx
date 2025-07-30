@@ -51,7 +51,7 @@ export default function ProfilePicture({
       // Then try to load from backend (in case user logged in on different device)
       const userId = await AsyncStorage.getItem('userId');
       if (userId) {
-        const response = await fetch(`http://192.168.1.101:3001/api/user-profile/${userId}`);
+        const response = await fetch(`https://immobili-backend-production.up.railway.app/api/user-profile/${userId}`);
         if (response.ok) {
           const userData = await response.json();
           if (userData.user?.profilePicture && userData.user.profilePicture !== savedImageUri) {
@@ -85,7 +85,7 @@ export default function ProfilePicture({
       const userId = await AsyncStorage.getItem('userId');
       if (!userId) return;
 
-      const response = await fetch('http://192.168.1.101:3001/api/update-profile-picture', {
+      const response = await fetch('https://immobili-backend-production.up.railway.app/api/update-profile-picture', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

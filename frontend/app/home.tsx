@@ -49,7 +49,7 @@ const ScooterDashboard: React.FC = () => {
         <View style={styles.scooterContainer}>
           <Image
             source={{
-              uri: "https://api.builder.io/api/v1/image/assets/TEMP/25ce964af8c388a37bd0c5a094f3715eb65f905f?width=924",
+              uri: "httpss://api.builder.io/api/v1/image/assets/TEMP/25ce964af8c388a37bd0c5a094f3715eb65f905f?width=924",
             }}
             style={styles.scooterImage}
           />
@@ -84,7 +84,7 @@ const ScooterDashboard: React.FC = () => {
             <View style={styles.cardIconContainer}>
               <Image
                 source={{
-                  uri: "https://api.builder.io/api/v1/image/assets/TEMP/752e97db974e549ecd825077f8fece72c632b4d1?width=50",
+                  uri: "httpss://api.builder.io/api/v1/image/assets/TEMP/752e97db974e549ecd825077f8fece72c632b4d1?width=50",
                 }}
                 style={styles.cardIcon}
               />
@@ -103,7 +103,7 @@ const ScooterDashboard: React.FC = () => {
             <View style={styles.cardIconContainer}>
               <Image
                 source={{
-                  uri: "https://api.builder.io/api/v1/image/assets/TEMP/9a936899395fe6460434678f8415bb5f7cd426b0?width=50",
+                  uri: "httpss://api.builder.io/api/v1/image/assets/TEMP/9a936899395fe6460434678f8415bb5f7cd426b0?width=50",
                 }}
                 style={styles.cardIcon}
               />
