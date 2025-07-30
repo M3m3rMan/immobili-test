@@ -622,77 +622,60 @@ const MapScreen: React.FC = () => {
     addTimeout(() => setIsMarkerPressed(false), 100);
   };
 
-  const handleSafeAlternativePress = (alternative: SafeAlternative) => {
+  const handleSafeAlternativePress = async (alternative: SafeAlternative) => {
     if (!debounceClick(() => {}, 200)) return; // Debounce rapid clicks
     
     setIsMarkerPressed(true);
     
-    // Show confirmation dialog to replace current destination
-    Alert.alert(
-      'Use Safe Alternative',
-      `Would you like to navigate to ${alternative.name} instead? This is a safer parking option.`,
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => {
-            // Just show details without changing destination
-            setSafeAlternative(alternative);
-            setSelectedReport(null);
-            setSelectedSafetyZone(null);
-            setShowDetails(true);
-            const animation = Animated.timing(slideAnim, {
-              toValue: 0,
-              duration: 300,
-              useNativeDriver: true,
-            });
-            addAnimation(animation);
-            animation.start();
-          }
-        },
-        {
-          text: 'Navigate Here',
-          onPress: async () => {
-            // Prevent multiple simultaneous operations
-            if (isProcessingClick) return;
-            setIsProcessingClick(true);
-            
-            // Replace current destination with the safe alternative
-            setIsAnalyzing(true);
-            
-            try {
-              const newDestination: Destination = {
-                latitude: alternative.latitude,
-                longitude: alternative.longitude,
-                name: alternative.name
-              };
-              
-              // Clear current route and alternatives
-              setDestination(null);
-              setShowDirections(false);
-              setSafeAlternatives([]);
-              setShowRouteAnalysis(false);
-              
-              // Set new destination
-              setDestinationInput(alternative.name);
-              setDestination(newDestination);
-              setShowDirections(true);
-              
-              // Analyze the new route
-              await analyzeRoute(newDestination);
-              
-              console.log(`Switched to safe alternative: ${alternative.name}`);
-            } catch (error) {
-              console.error('Error switching to safe alternative:', error);
-              Alert.alert('Error', 'Failed to set new destination. Please try again.');
-              setIsAnalyzing(false);
-            } finally {
-              setIsProcessingClick(false);
-            }
-          }
-        }
-      ]
-    );
+    // Prevent multiple simultaneous operations
+    if (isProcessingClick) return;
+    setIsProcessingClick(true);
+    
+    // Show details panel
+    setSafeAlternative(alternative);
+    setSelectedReport(null);
+    setSelectedSafetyZone(null);
+    setShowDetails(true);
+    const animation = Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    });
+    addAnimation(animation);
+    animation.start();
+    
+    // Directly navigate to the safe alternative
+    setIsAnalyzing(true);
+    
+    try {
+      const newDestination: Destination = {
+        latitude: alternative.latitude,
+        longitude: alternative.longitude,
+        name: alternative.name
+      };
+      
+      // Clear current route and alternatives
+      setDestination(null);
+      setShowDirections(false);
+      setSafeAlternatives([]);
+      setShowRouteAnalysis(false);
+      
+      // Set new destination
+      setDestinationInput(alternative.name);
+      setDestination(newDestination);
+      setShowDirections(true);
+      
+      // Analyze the new route
+      await analyzeRoute(newDestination);
+      
+      console.log(`Switched to safe alternative: ${alternative.name}`);
+    } catch (error) {
+      console.error('Error switching to safe alternative:', error);
+      Alert.alert('Error', 'Failed to set new destination. Please try again.');
+      setIsAnalyzing(false);
+    } finally {
+      setIsProcessingClick(false);
+    }
     
     // Reset the flag after a short delay using tracked timeout
     addTimeout(() => setIsMarkerPressed(false), 100);
