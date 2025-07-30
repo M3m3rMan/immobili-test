@@ -332,9 +332,9 @@ const MapScreen: React.FC = () => {
       case 'warning-alt':
         return require('../assets/images/map/red_error2.png'); // Different red icon for variety
       case 'safety':
-        return require('../assets/images/map/Ellipse 15.png');
+        return require('../assets/images/map/clear-green-marker.png');
       case 'alternative':
-        return require('../assets/images/map/Ellipse 15.png');
+        return require('../assets/images/map/clear-green-marker.png');
       case 'destination':
         // You can add a blue destination icon here if you have one
         return null; // Will use default blue pin
@@ -668,7 +668,7 @@ const MapScreen: React.FC = () => {
     try {
       // Use reverse geocoding to get a readable location name
       const reverseGeocode = await fetch(
-        `httpss://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_APIKEY}`
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${coordinate.latitude},${coordinate.longitude}&key=${GOOGLE_MAPS_APIKEY}`
       );
       const geocodeData = await reverseGeocode.json();
       
@@ -799,7 +799,7 @@ const MapScreen: React.FC = () => {
   const geocodeAddress = async (address: string): Promise<Destination | null> => {
     try {
       const response = await fetch(
-        `httpss://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
+        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
       );
       
       const data = await response.json();
