@@ -124,7 +124,7 @@ export default function ProfilePage() {
           onPress: async () => {
             try {
               await AsyncStorage.clear();
-              router.replace('/LoginScreen');
+              router.replace('/');
             } catch (error) {
               console.error('Error during logout:', error);
             }
