@@ -21,7 +21,7 @@ import {
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,10 +31,18 @@ export default function RegisterScreen() {
   const router = useRouter();
 
   const handleRegister = async () => {
-    if (!username || !phone || !password || !confirmPassword) {
+    if (!username || !email || !password || !confirmPassword) {
       Alert.alert('Error', 'All fields are required');
       return;
     }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Please enter a valid email address');
+      return;
+    }
+    
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Passwords do not match');
       return;
@@ -47,7 +55,7 @@ export default function RegisterScreen() {
       const res = await fetch('https://immobili-backend-production.up.railway.app/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, phone, password }),
+        body: JSON.stringify({ username, email, password }),
       });
       const data = await res.json();
       
@@ -120,14 +128,15 @@ export default function RegisterScreen() {
                     />
                   </View>
                   <View style={styles.inputContainer}>
-                    <Ionicons name="call-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
+                    <Ionicons name="mail-outline" size={20} color="#94a3b8" style={styles.inputIcon} />
                     <TextInput
                       style={styles.input}
-                      placeholder="Phone Number"
+                      placeholder="Email Address"
                       placeholderTextColor="#94a3b8"
-                      value={phone}
-                      onChangeText={setPhone}
-                      keyboardType="phone-pad"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
                       autoCorrect={false}
                     />
                   </View>
