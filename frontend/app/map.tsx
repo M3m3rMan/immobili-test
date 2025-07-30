@@ -480,10 +480,62 @@ const MapScreen: React.FC = () => {
     return () => {
       keyboardWillShowListener?.remove();
       keyboardWillHideListener?.remove();
+      cleanup(); // Clean up timeouts and animations
+    };
+  }, []);
+
+  // Cleanup effect for component unmount
+  useEffect(() => {
+    return () => {
+      cleanup();
     };
   }, []);
 
   const [isMarkerPressed, setIsMarkerPressed] = useState(false);
+  const [isProcessingClick, setIsProcessingClick] = useState(false);
+  const timeoutRefs = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const lastClickTime = useRef<number>(0);
+  const animationRefs = useRef<Animated.CompositeAnimation[]>([]);
+
+  // Cleanup function for timeouts and animations
+  const cleanup = () => {
+    // Clear all timeouts
+    timeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+    timeoutRefs.current = [];
+    
+    // Stop all animations
+    animationRefs.current.forEach(animation => animation.stop());
+    animationRefs.current = [];
+  };
+
+  // Add timeout with tracking
+  const addTimeout = (callback: () => void, delay: number) => {
+    const timeout = setTimeout(() => {
+      callback();
+      // Remove from tracking array
+      timeoutRefs.current = timeoutRefs.current.filter(t => t !== timeout);
+    }, delay);
+    timeoutRefs.current.push(timeout);
+    return timeout;
+  };
+
+  // Add animation with tracking
+  const addAnimation = (animation: Animated.CompositeAnimation) => {
+    animationRefs.current.push(animation);
+    return animation;
+  };
+
+  // Debounce function for rapid clicks
+  const debounceClick = (callback: () => void, delay: number = 300) => {
+    const now = Date.now();
+    if (now - lastClickTime.current < delay) {
+      console.log('Click debounced - too rapid');
+      return false;
+    }
+    lastClickTime.current = now;
+    callback();
+    return true;
+  };
 
   // Bottom sheet pan gesture handler
   const onPanGestureEvent = (event: any) => {
@@ -502,20 +554,24 @@ const MapScreen: React.FC = () => {
 
   const expandBottomSheet = () => {
     setIsBottomSheetExpanded(true);
-    Animated.timing(bottomSheetAnim, {
+    const animation = Animated.timing(bottomSheetAnim, {
       toValue: 1,
       duration: 300,
       useNativeDriver: false,
-    }).start();
+    });
+    addAnimation(animation);
+    animation.start();
   };
 
   const collapseBottomSheet = () => {
     setIsBottomSheetExpanded(false);
-    Animated.timing(bottomSheetAnim, {
+    const animation = Animated.timing(bottomSheetAnim, {
       toValue: 0,
       duration: 300,
       useNativeDriver: false,
-    }).start();
+    });
+    addAnimation(animation);
+    animation.start();
   };
 
   const toggleBottomSheet = () => {
@@ -527,36 +583,48 @@ const MapScreen: React.FC = () => {
   };
 
   const handleMarkerPress = (report: TheftReport) => {
+    if (!debounceClick(() => {}, 200)) return; // Debounce rapid clicks
+    
     setIsMarkerPressed(true);
     setSelectedReport(report);
     setSelectedSafetyZone(null);
     setShowDetails(true);
-    Animated.timing(slideAnim, {
+    
+    const animation = Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
-    }).start();
+    });
+    addAnimation(animation);
+    animation.start();
     
-    // Reset the flag after a short delay
-    setTimeout(() => setIsMarkerPressed(false), 100);
+    // Reset the flag after a short delay using tracked timeout
+    addTimeout(() => setIsMarkerPressed(false), 100);
   };
 
   const handleSafetyZonePress = (zone: SafetyZone) => {
+    if (!debounceClick(() => {}, 200)) return; // Debounce rapid clicks
+    
     setIsMarkerPressed(true);
     setSelectedSafetyZone(zone);
     setSelectedReport(null);
     setShowDetails(true);
-    Animated.timing(slideAnim, {
+    
+    const animation = Animated.timing(slideAnim, {
       toValue: 0,
       duration: 300,
       useNativeDriver: true,
-    }).start();
+    });
+    addAnimation(animation);
+    animation.start();
     
-    // Reset the flag after a short delay
-    setTimeout(() => setIsMarkerPressed(false), 100);
+    // Reset the flag after a short delay using tracked timeout
+    addTimeout(() => setIsMarkerPressed(false), 100);
   };
 
   const handleSafeAlternativePress = (alternative: SafeAlternative) => {
+    if (!debounceClick(() => {}, 200)) return; // Debounce rapid clicks
+    
     setIsMarkerPressed(true);
     
     // Show confirmation dialog to replace current destination
@@ -573,16 +641,22 @@ const MapScreen: React.FC = () => {
             setSelectedReport(null);
             setSelectedSafetyZone(null);
             setShowDetails(true);
-            Animated.timing(slideAnim, {
+            const animation = Animated.timing(slideAnim, {
               toValue: 0,
               duration: 300,
               useNativeDriver: true,
-            }).start();
+            });
+            addAnimation(animation);
+            animation.start();
           }
         },
         {
           text: 'Navigate Here',
           onPress: async () => {
+            // Prevent multiple simultaneous operations
+            if (isProcessingClick) return;
+            setIsProcessingClick(true);
+            
             // Replace current destination with the safe alternative
             setIsAnalyzing(true);
             
@@ -612,22 +686,26 @@ const MapScreen: React.FC = () => {
               console.error('Error switching to safe alternative:', error);
               Alert.alert('Error', 'Failed to set new destination. Please try again.');
               setIsAnalyzing(false);
+            } finally {
+              setIsProcessingClick(false);
             }
           }
         }
       ]
     );
     
-    // Reset the flag after a short delay
-    setTimeout(() => setIsMarkerPressed(false), 100);
+    // Reset the flag after a short delay using tracked timeout
+    addTimeout(() => setIsMarkerPressed(false), 100);
   };
 
   const handleCloseDetails = () => {
-    Animated.timing(slideAnim, {
+    const animation = Animated.timing(slideAnim, {
       toValue: 300,
       duration: 300,
       useNativeDriver: true,
-    }).start(() => {
+    });
+    addAnimation(animation);
+    animation.start(() => {
       setShowDetails(false);
       setSelectedReport(null);
       setSelectedSafetyZone(null);
@@ -636,6 +714,12 @@ const MapScreen: React.FC = () => {
   };
 
   const handlePoiClick = async (event: any) => {
+    // Debounce rapid clicks and prevent multiple simultaneous operations
+    if (!debounceClick(() => {}, 300) || isProcessingClick) {
+      console.log('POI click ignored - too rapid or already processing');
+      return;
+    }
+    
     const { coordinate, name, placeId } = event.nativeEvent;
     
     console.log('POI clicked:', { name, coordinate, placeId });
@@ -652,6 +736,10 @@ const MapScreen: React.FC = () => {
         {
           text: 'Yes',
           onPress: async () => {
+            // Prevent multiple simultaneous operations
+            if (isProcessingClick) return;
+            setIsProcessingClick(true);
+            
             setIsAnalyzing(true);
             
             try {
@@ -674,6 +762,8 @@ const MapScreen: React.FC = () => {
               console.error('Error setting POI destination:', error);
               Alert.alert('Error', 'Failed to set destination. Please try again.');
               setIsAnalyzing(false);
+            } finally {
+              setIsProcessingClick(false);
             }
           },
         },
@@ -716,6 +806,13 @@ const MapScreen: React.FC = () => {
   };
 
   const handleMapPress = async (coordinate: { latitude: number; longitude: number }) => {
+    // Debounce rapid clicks and prevent multiple simultaneous operations
+    if (!debounceClick(() => {}, 300) || isProcessingClick) {
+      console.log('Map press ignored - too rapid or already processing');
+      return;
+    }
+    
+    setIsProcessingClick(true);
     console.log('Map tapped at:', coordinate);
     
     // Clear any existing route first
@@ -816,6 +913,8 @@ const MapScreen: React.FC = () => {
         Alert.alert('Error', 'Failed to set destination. Please try again.');
         setIsAnalyzing(false);
       }
+    } finally {
+      setIsProcessingClick(false);
     }
   };
 
@@ -1181,7 +1280,7 @@ const getSafetyColor = (safetyLevel: string) => {
             onPress={() => {
               setIsMarkerPressed(true);
               // Just prevent route analysis, don't show details for destination marker
-              setTimeout(() => setIsMarkerPressed(false), 100);
+              addTimeout(() => setIsMarkerPressed(false), 100);
             }}
             image={getMarkerIcon('destination')}
             pinColor="blue" // Fallback if no custom image
