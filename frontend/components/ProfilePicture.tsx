@@ -44,7 +44,7 @@ export default function ProfilePicture({
     try {
       // First try to load from AsyncStorage (local cache)
       const savedImageUri = await AsyncStorage.getItem('profilePicture');
-      if (savedImageUri) {
+      if (savedImageUri && isValidImageUrl(savedImageUri)) {
         setImageUri(savedImageUri);
       }
       
@@ -54,7 +54,9 @@ export default function ProfilePicture({
         const response = await fetch(`https://immobili-backend-production.up.railway.app/api/user-profile/${userId}`);
         if (response.ok) {
           const userData = await response.json();
-          if (userData.user?.profilePicture && userData.user.profilePicture !== savedImageUri) {
+          if (userData.user?.profilePicture && 
+              isValidImageUrl(userData.user.profilePicture) && 
+              userData.user.profilePicture !== savedImageUri) {
             // Update local storage and state if backend has newer image
             await AsyncStorage.setItem('profilePicture', userData.user.profilePicture);
             setImageUri(userData.user.profilePicture);
@@ -66,42 +68,89 @@ export default function ProfilePicture({
     }
   };
 
+  const isValidImageUrl = (url: string): boolean => {
+    if (!url) return false;
+    
+    // Check if it's a valid HTTP/HTTPS URL
+    try {
+      const urlObj = new URL(url);
+      return urlObj.protocol === 'http:' || urlObj.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  };
+
   const saveProfilePicture = async (uri: string) => {
     try {
-      await AsyncStorage.setItem('profilePicture', uri);
-      setImageUri(uri);
-      onImageChange?.(uri);
+      setLoading(true);
       
-      // Also update the backend user profile
-      await updateBackendProfilePicture(uri);
+      // Upload image to backend first
+      const uploadedImageUrl = await uploadImageToBackend(uri);
+      
+      if (uploadedImageUrl) {
+        // Save the server URL locally and update state
+        await AsyncStorage.setItem('profilePicture', uploadedImageUrl);
+        setImageUri(uploadedImageUrl);
+        onImageChange?.(uploadedImageUrl);
+      }
     } catch (error) {
       console.error('Error saving profile picture:', error);
       Alert.alert('Error', 'Failed to save profile picture');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const uploadImageToBackend = async (localUri: string): Promise<string | null> => {
+    try {
+      const userId = await AsyncStorage.getItem('userId');
+      if (!userId) {
+        Alert.alert('Error', 'User not logged in');
+        return null;
+      }
+
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Add the image file
+      formData.append('image', {
+        uri: localUri,
+        type: 'image/jpeg',
+        name: 'profile-picture.jpg',
+      } as any);
+      
+      // Add userId
+      formData.append('userId', userId);
+
+      const response = await fetch('https://immobili-backend-production.up.railway.app/api/upload-profile-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Profile image uploaded successfully:', data.imageUrl);
+        return data.imageUrl;
+      } else {
+        const errorData = await response.text();
+        console.error('Failed to upload profile image:', errorData);
+        Alert.alert('Error', 'Failed to upload image to server');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error uploading image to backend:', error);
+      Alert.alert('Error', 'Failed to upload image');
+      return null;
     }
   };
 
   const updateBackendProfilePicture = async (imageUri: string) => {
-    try {
-      const userId = await AsyncStorage.getItem('userId');
-      if (!userId) return;
-
-      const response = await fetch('https://immobili-backend-production.up.railway.app/api/update-profile-picture', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          profilePicture: imageUri,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('Failed to update profile picture on backend');
-      }
-    } catch (error) {
-      console.error('Error updating backend profile picture:', error);
-    }
+    // This function is no longer needed since uploadImageToBackend handles the database update
+    // Keeping it for backward compatibility but it's essentially a no-op now
+    return;
   };
 
   const requestPermissions = async () => {
@@ -110,8 +159,21 @@ export default function ProfilePicture({
     }
 
     try {
-      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-      const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      // Check current permissions first
+      const cameraStatus = await ImagePicker.getCameraPermissionsAsync();
+      const mediaStatus = await ImagePicker.getMediaLibraryPermissionsAsync();
+      
+      // Only request if not already granted
+      let cameraPermission = cameraStatus;
+      let mediaPermission = mediaStatus;
+      
+      if (cameraStatus.status !== 'granted') {
+        cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      }
+      
+      if (mediaStatus.status !== 'granted') {
+        mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
       
       return cameraPermission.status === 'granted' && mediaPermission.status === 'granted';
     } catch (error) {
@@ -143,7 +205,6 @@ export default function ProfilePicture({
     }
 
     try {
-      setLoading(true);
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -157,8 +218,6 @@ export default function ProfilePicture({
     } catch (error) {
       console.error('Camera error:', error);
       Alert.alert('Error', 'Failed to take photo');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -170,7 +229,6 @@ export default function ProfilePicture({
     }
 
     try {
-      setLoading(true);
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -184,8 +242,6 @@ export default function ProfilePicture({
     } catch (error) {
       console.error('Gallery error:', error);
       Alert.alert('Error', 'Failed to pick image');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -214,6 +270,17 @@ export default function ProfilePicture({
           <Image
             source={{ uri: imageUri }}
             style={[styles.image, { borderRadius }]}
+            onError={(error) => {
+              console.log('Image loading error:', error.nativeEvent.error);
+              // Reset to placeholder if image fails to load
+              setImageUri(null);
+            }}
+            onLoadStart={() => {
+              console.log('Image loading started for:', imageUri);
+            }}
+            onLoad={() => {
+              console.log('Image loaded successfully:', imageUri);
+            }}
           />
         ) : (
           <View style={[styles.placeholder, { borderRadius }]}>

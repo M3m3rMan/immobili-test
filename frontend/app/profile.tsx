@@ -101,7 +101,7 @@ export default function ProfilePage() {
         await AsyncStorage.setItem('email', settings.email);
         
         // Navigate back to home page instead of showing alert
-        router.push('/home');
+        router.push('/map');
       } else {
         const errorData = await response.json();
         Alert.alert('Error', errorData.error || 'Failed to save settings.');

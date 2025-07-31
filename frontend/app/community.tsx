@@ -82,7 +82,6 @@ export default function Community() {
   const tintColor = useThemeColor({}, 'tint');
 
   useEffect(() => {
-    requestCameraPermission();
     loadUserData();
     fetchPosts();
   }, []);
@@ -230,9 +229,21 @@ export default function Community() {
     }
 
     try {
-      // Request both camera and media library permissions
-      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
-      const mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      // Check current permissions first
+      const cameraStatus = await ImagePicker.getCameraPermissionsAsync();
+      const mediaStatus = await ImagePicker.getMediaLibraryPermissionsAsync();
+      
+      // Only request if not already granted
+      let cameraPermission = cameraStatus;
+      let mediaPermission = mediaStatus;
+      
+      if (cameraStatus.status !== 'granted') {
+        cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      }
+      
+      if (mediaStatus.status !== 'granted') {
+        mediaPermission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      }
       
       setCameraPermission(
         cameraPermission.status === 'granted' && mediaPermission.status === 'granted'
@@ -249,6 +260,9 @@ export default function Community() {
       return;
     }
 
+    // Request permissions when user actually tries to use camera
+    await requestCameraPermission();
+    
     if (cameraPermission === false) {
       Alert.alert('Permission Required', 'Camera permission is required to take photos.');
       return;
@@ -277,6 +291,9 @@ export default function Community() {
       return;
     }
 
+    // Request permissions when user actually tries to use image picker
+    await requestCameraPermission();
+
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -297,6 +314,41 @@ export default function Community() {
   const openCreatePostModal = async () => {
     // Simply open the modal - the createPost function will handle username retrieval
     setShowCreatePost(true);
+  };
+
+  const uploadPostImageToBackend = async (localUri: string): Promise<string | null> => {
+    try {
+      // Create FormData for file upload
+      const formData = new FormData();
+      
+      // Add the image file
+      formData.append('image', {
+        uri: localUri,
+        type: 'image/jpeg',
+        name: 'post-image.jpg',
+      } as any);
+
+      const response = await fetch('https://immobili-backend-production.up.railway.app/api/upload-post-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Post image uploaded successfully:', data.imageUrl);
+        return data.imageUrl;
+      } else {
+        const errorData = await response.text();
+        console.error('Failed to upload post image:', errorData);
+        return null;
+      }
+    } catch (error) {
+      console.error('Error uploading post image to backend:', error);
+      return null;
+    }
   };
 
   const createPost = async () => {
@@ -333,7 +385,19 @@ export default function Community() {
     try {
       // Store the values before clearing them
       const postText = newPostText;
-      const postImage = selectedImage;
+      let postImageUrl = null;
+      
+      // Upload image to backend if one is selected
+      if (selectedImage) {
+        console.log('📤 Uploading image to backend...');
+        postImageUrl = await uploadPostImageToBackend(selectedImage);
+        if (!postImageUrl) {
+          Alert.alert('Error', 'Failed to upload image. Please try again.');
+          setLoading(false);
+          return;
+        }
+        console.log('✅ Image uploaded successfully:', postImageUrl);
+      }
       
       // Create a new post object for immediate display
       const newPost: CommunityPost = {
@@ -341,7 +405,7 @@ export default function Community() {
         username: finalUsername,
         avatar: '🛴',
         text: postText,
-        image: postImage || undefined,
+        image: postImageUrl || undefined,
         timestamp: 'Just now',
         likes: 0,
         comments: 0,
@@ -370,7 +434,7 @@ export default function Community() {
             text: postText,
             userId: userId,
             username: finalUsername,
-            image: postImage || undefined,
+            image: postImageUrl || undefined,
           }),
         });
 

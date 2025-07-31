@@ -5,11 +5,48 @@ const pdfParse = require('pdf-parse');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { OpenAI } = require('openai');
+const multer = require('multer');
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(uploadsDir));
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Only allow image files
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
 
 mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true, useUnifiedTopology: true });
 
@@ -711,6 +748,71 @@ app.post('/api/update-profile-picture', express.json(), async (req, res) => {
     res.json({ message: 'Profile picture updated successfully', user });
   } catch (err) {
     console.error('Error updating profile picture:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Image upload endpoint for profile pictures
+app.post('/api/upload-profile-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
+
+    // Generate the full URL for the uploaded image
+    // Use Railway URL in production, fallback to local for development
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://immobili-backend-production.up.railway.app'
+      : `${req.protocol}://${req.get('host')}`;
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    
+    // Update user's profile picture in database
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { profilePicture: imageUrl },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ 
+      message: 'Profile image uploaded successfully', 
+      imageUrl: imageUrl,
+      user: user
+    });
+  } catch (err) {
+    console.error('Error uploading profile image:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Image upload endpoint for post images
+app.post('/api/upload-post-image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    // Generate the full URL for the uploaded image
+    // Use Railway URL in production, fallback to local for development
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://immobili-backend-production.up.railway.app'
+      : `${req.protocol}://${req.get('host')}`;
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    
+    res.json({ 
+      message: 'Post image uploaded successfully', 
+      imageUrl: imageUrl
+    });
+  } catch (err) {
+    console.error('Error uploading post image:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
