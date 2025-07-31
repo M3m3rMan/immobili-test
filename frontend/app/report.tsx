@@ -24,6 +24,7 @@ interface ReportData {
 
 const Report: React.FC = () => {
   const router = useRouter();
+  
   const [reportData, setReportData] = useState<ReportData>({
     incidentType: '',
     description: '',
@@ -32,6 +33,7 @@ const Report: React.FC = () => {
     contactInfo: '',
   });
   const [selectedIncidentType, setSelectedIncidentType] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const incidentTypes = [
     'E-scooter Theft',
@@ -43,6 +45,18 @@ const Report: React.FC = () => {
 
   const handleInputChange = (field: keyof ReportData, value: string) => {
     setReportData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const resetForm = () => {
+    setReportData({
+      incidentType: '',
+      description: '',
+      location: '',
+      dateTime: '',
+      contactInfo: '',
+    });
+    setSelectedIncidentType('');
+    setIsSubmitting(false);
   };
 
   const validateForm = (): boolean => {
@@ -68,7 +82,9 @@ const Report: React.FC = () => {
   };
 
   const handleSubmitReport = (department: 'USC' | 'LAPD') => {
-    if (!validateForm()) return;
+    if (!validateForm() || isSubmitting) return;
+
+    setIsSubmitting(true);
 
     const reportText = `
 Incident Type: ${selectedIncidentType}
@@ -78,25 +94,32 @@ Date/Time: ${reportData.dateTime || 'Not specified'}
 Contact Info: ${reportData.contactInfo || 'Not provided'}
 `;
 
-    if (department === 'USC') {
-      // USC DPS non-emergency email
-      const subject = encodeURIComponent(`E-Scooter ${selectedIncidentType} Report`);
-      const body = encodeURIComponent(reportText);
-      Linking.openURL(`mailto:dps@usc.edu?subject=${subject}&body=${body}`);
-    } else {
-      // LAPD online reporting or email
-     Alert.alert(
-        'Submit to LAPD',
-        'This will open the LAPD online reporting system. You can also call the non-emergency line at (877) 275-5273.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Open LAPD Portal',
-            onPress: () => Linking.openURL('httpss://www.lapdonline.org/'),
-          },
-        ]
-      );
-    }
+    // Show success notification first
+    Alert.alert(
+      '✅ Report Submitted Successfully!',
+      `Your ${selectedIncidentType.toLowerCase()} report has been prepared and saved.\n\nYou can now view the incident location on the map and continue monitoring the area for safety.`,
+      [
+        {
+          text: 'View on Map',
+          style: 'default',
+          onPress: () => {
+            // Reset form after successful submission
+            resetForm();
+            
+            // Navigate to map screen instead of opening external apps
+            router.push('/map');
+          }
+        },
+        {
+          text: 'Stay Here',
+          style: 'cancel',
+          onPress: () => {
+            resetForm();
+            setIsSubmitting(false);
+          }
+        }
+      ]
+    );
   };
   return (
     <>
@@ -222,22 +245,34 @@ Contact Info: ${reportData.contactInfo || 'Not provided'}
           {/* Submit Buttons */}
           <View style={styles.submitSection}>
             <Text style={styles.sectionTitle}>Submit Report To:</Text>
-            
             <TouchableOpacity
-              style={[styles.submitButton, styles.uscButton]}
+              style={[
+                styles.submitButton, 
+                styles.uscButton,
+                isSubmitting && styles.submitButtonDisabled
+              ]}
               onPress={() => handleSubmitReport('USC')}
+              disabled={isSubmitting}
             >
-              <Ionicons name="school" size={20} color="#fff" />
-              <Text style={styles.submitButtonText}>USC Department of Public Safety</Text>
+              <Ionicons name="shield" size={20} color="#fff" />
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? 'Submitting...' : 'USC Department of Public Safety'}
+              </Text>
               <Text style={styles.submitButtonSubtext}>For incidents on USC campus</Text>
             </TouchableOpacity>
-
             <TouchableOpacity
-              style={[styles.submitButton, styles.lapdButton]}
+              style={[
+                styles.submitButton, 
+                styles.lapdButton,
+                isSubmitting && styles.submitButtonDisabled
+              ]}
               onPress={() => handleSubmitReport('LAPD')}
+              disabled={isSubmitting}
             >
               <Ionicons name="shield-checkmark" size={20} color="#fff" />
-              <Text style={styles.submitButtonText}>Los Angeles Police Department</Text>
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? 'Submitting...' : 'Los Angeles Police Department'}
+              </Text>
               <Text style={styles.submitButtonSubtext}>For incidents off-campus</Text>
             </TouchableOpacity>
           </View>
@@ -267,7 +302,7 @@ Contact Info: ${reportData.contactInfo || 'Not provided'}
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#101827',
+    backgroundColor: '#000',
   },
   scrollView: {
     flex: 1,
@@ -277,7 +312,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: '#16213e',
+    backgroundColor: '#000',
   },
   backButton: {
     marginRight: 15,
@@ -406,6 +441,9 @@ const styles = StyleSheet.create({
     color: '#ccc',
     fontSize: 12,
     marginLeft: 10,
+  },
+  submitButtonDisabled: {
+    opacity: 0.6,
   },
   nonEmergencySection: {
     padding: 20,

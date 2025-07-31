@@ -314,6 +314,9 @@ const MapScreen: React.FC = () => {
   const [showSafeAlternatives, setShowSafeAlternatives] = useState(false);
   const [showRouteAnalysis, setShowRouteAnalysis] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const slideAnim = useState(new Animated.Value(300))[0];
   
   // Add keyboard state management
@@ -335,9 +338,9 @@ const MapScreen: React.FC = () => {
       case 'warning-alt':
         return require('../assets/images/map/red_error2.png'); // Different red icon for variety
       case 'safety':
-        return require('../assets/images/map/clear-green-marker.png');
+        return require('../assets/images/map/thin-green-marker.png');
       case 'alternative':
-        return require('../assets/images/map/clear-green-marker.png');
+        return require('../assets/images/map/thin-green-marker.png');
       case 'destination':
         // You can add a blue destination icon here if you have one
         return null; // Will use default blue pin
@@ -488,6 +491,10 @@ const MapScreen: React.FC = () => {
   useEffect(() => {
     return () => {
       cleanup();
+      // Clean up debounced suggestions timeout
+      if (debouncedFetchSuggestions.current) {
+        clearTimeout(debouncedFetchSuggestions.current);
+      }
     };
   }, []);
 
@@ -901,9 +908,181 @@ const MapScreen: React.FC = () => {
     }
   };
 
+  // Enhanced Google Places Autocomplete function using backend API
+  const fetchAddressSuggestions = async (input: string) => {
+    if (input.length < 3) {
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    setIsLoadingSuggestions(true);
+    
+    try {
+      // Use backend API for enhanced suggestions with USC-specific and AI-powered corrections
+      const response = await fetch(
+        `https://immobili-backend-production.up.railway.app/api/places-autocomplete?input=${encodeURIComponent(input)}&sessiontoken=${Date.now()}`
+      );
+      
+      if (!response.ok) {
+        throw new Error('Backend API request failed');
+      }
+      
+      const data = await response.json();
+      let suggestions: any[] = [];
+      
+      if (data.status === 'OK' || data.status === 'AI_FALLBACK') {
+        suggestions = (data.predictions || []).slice(0, 5);
+        
+        // Mark suggestions appropriately
+        suggestions = suggestions.map(suggestion => ({
+          ...suggestion,
+          isAISuggestion: suggestion.isAISuggestion || suggestion.isUSCSuggestion || false
+        }));
+      } else {
+        console.warn('Backend Places API returned:', data.status);
+        // Fallback to client-side AI suggestions
+        const aiCorrections = generateAddressCorrections(input);
+        suggestions = aiCorrections.map((correction, index) => ({
+          place_id: `ai_fallback_${index}`,
+          description: correction,
+          structured_formatting: {
+            main_text: correction.split(',')[0],
+            secondary_text: correction.split(',').slice(1).join(',').trim()
+          },
+          isAISuggestion: true
+        }));
+      }
+      
+      setAddressSuggestions(suggestions);
+      setShowSuggestions(suggestions.length > 0);
+    } catch (error) {
+      console.error('Error fetching suggestions from backend:', error);
+      
+      // Fallback to client-side AI suggestions on network error
+      const aiCorrections = generateAddressCorrections(input);
+      const fallbackSuggestions = aiCorrections.map((correction, index) => ({
+        place_id: `ai_fallback_${index}`,
+        description: correction,
+        structured_formatting: {
+          main_text: correction.split(',')[0],
+          secondary_text: correction.split(',').slice(1).join(',').trim()
+        },
+        isAISuggestion: true
+      }));
+      
+      setAddressSuggestions(fallbackSuggestions);
+      setShowSuggestions(fallbackSuggestions.length > 0);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
+
+  // Debounced version of fetchAddressSuggestions
+const debouncedFetchSuggestions = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  
+  const handleInputChange = (text: string) => {
+    setDestinationInput(text);
+    
+    // Clear previous timeout
+    if (debouncedFetchSuggestions.current) {
+      clearTimeout(debouncedFetchSuggestions.current);
+    }
+    
+    // Set new timeout for debounced search
+    debouncedFetchSuggestions.current = setTimeout(() => {
+      fetchAddressSuggestions(text);
+    }, 300); // 300ms delay
+  };
+
+  // Handle suggestion selection
+  const handleSuggestionSelect = async (suggestion: any) => {
+    // Use the exact description from the suggestion
+    const exactAddress = suggestion.description;
+    setDestinationInput(exactAddress);
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
+    
+    // If this is a Places API suggestion with place_id, use it for more accurate geocoding
+    if (suggestion.place_id && !suggestion.isAISuggestion) {
+      try {
+        const response = await fetch(
+          `https://immobili-backend-production.up.railway.app/api/geocode-place?placeId=${encodeURIComponent(suggestion.place_id)}`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'OK' && data.results && data.results.length > 0) {
+            const result = data.results[0];
+            const location = result.geometry.location;
+            
+            // Update the input with the formatted address from Places API
+            setDestinationInput(result.formatted_address);
+            
+            // Automatically trigger destination setting with the exact coordinates
+            setTimeout(() => {
+              handleSetDestination();
+            }, 100);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error getting place details:', error);
+      }
+    }
+    
+    // Fallback to regular geocoding
+    setTimeout(() => {
+      handleSetDestination();
+    }, 100);
+  };
+
+  // Helper function to validate and suggest improvements for user input
+  const validateLocationInput = (input: string): { isValid: boolean; suggestion?: string } => {
+    const trimmedInput = input.trim();
+    
+    if (trimmedInput.length < 3) {
+      return { isValid: false, suggestion: 'Enter at least 3 characters' };
+    }
+    
+    // Check if input looks like it might be incomplete
+    const hasNumbers = /\d/.test(trimmedInput);
+    const hasComma = trimmedInput.includes(',');
+    const words = trimmedInput.split(' ').filter(word => word.length > 0);
+    
+    // If it has numbers but no street indicator, suggest adding street info
+    if (hasNumbers && !trimmedInput.toLowerCase().includes('st') && 
+        !trimmedInput.toLowerCase().includes('ave') && 
+        !trimmedInput.toLowerCase().includes('blvd') && 
+        !trimmedInput.toLowerCase().includes('rd') && 
+        !trimmedInput.toLowerCase().includes('way') && 
+        !trimmedInput.toLowerCase().includes('dr') && words.length < 3) {
+      return { isValid: true, suggestion: 'Try adding street type (St, Ave, Blvd) and city' };
+    }
+    
+    // If it's just one word and not a known landmark, suggest adding more details
+    if (words.length === 1 && trimmedInput.length < 10 && !hasNumbers) {
+      return { isValid: true, suggestion: 'Try adding city or more details' };
+    }
+    
+    // If it has no city/state info and looks like an address
+    if (hasNumbers && !hasComma && words.length < 4) {
+      return { isValid: true, suggestion: 'Consider adding city and state' };
+    }
+    
+    return { isValid: true };
+  };
+
   const handleSetDestination = async () => {
     if (!destinationInput.trim()) {
       Alert.alert('Error', 'Please enter a destination');
+      return;
+    }
+
+    // Validate input and show suggestion if needed
+    const validation = validateLocationInput(destinationInput);
+    if (!validation.isValid) {
+      Alert.alert('Input Too Short', validation.suggestion || 'Please enter a more complete location');
       return;
     }
 
@@ -911,14 +1090,22 @@ const MapScreen: React.FC = () => {
     
     try {
       // Use Google Places API to get accurate coordinates
-      const destination = await geocodeAddress(destinationInput);
+      const result = await geocodeAddress(destinationInput);
       
-      if (!destination) {
-        Alert.alert('Error', 'Could not find the specified location. Please try a different address.');
+      if (!result.success) {
+        // Show more helpful error message with suggestions
+        Alert.alert(
+          'Location Not Found', 
+          result.message,
+          [
+            { text: 'OK', style: 'default' }
+          ]
+        );
         setIsAnalyzing(false);
         return;
       }
 
+      const destination = result.destination!;
       console.log(`Found destination: ${destination.name} at (${destination.latitude}, ${destination.longitude})`);
       
       setDestination(destination);
@@ -933,31 +1120,183 @@ const MapScreen: React.FC = () => {
     }
   };
 
-  // Add this function to use Google Places API for geocoding
-  const geocodeAddress = async (address: string): Promise<Destination | null> => {
+  // AI-powered address correction suggestions
+  const generateAddressCorrections = (originalAddress: string): string[] => {
+    const suggestions: string[] = [];
+    const address = originalAddress.toLowerCase().trim();
+    
+    // Common USC campus locations and corrections
+    const uscCorrections: { [key: string]: string } = {
+      'usc': 'University of Southern California, Los Angeles, CA',
+      'university of southern california': 'University of Southern California, Los Angeles, CA',
+      'tommy trojan': 'Tommy Trojan Statue, USC Campus, Los Angeles, CA',
+      'doheny library': 'Doheny Memorial Library, USC, Los Angeles, CA',
+      'village': 'USC Village, Los Angeles, CA',
+      'parkside': 'Parkside Apartments, USC, Los Angeles, CA',
+      'lyon center': 'Lyon Recreation Center, USC, Los Angeles, CA',
+      'student union': 'Ronald Tutor Campus Center, USC, Los Angeles, CA',
+      'tutor center': 'Ronald Tutor Campus Center, USC, Los Angeles, CA',
+      'exposition': 'Exposition Boulevard, Los Angeles, CA',
+      'figueroa': 'Figueroa Street, Los Angeles, CA',
+      'vermont': 'Vermont Avenue, Los Angeles, CA'
+    };
+
+    // Check for USC-specific corrections
+    for (const [key, correction] of Object.entries(uscCorrections)) {
+      if (address.includes(key)) {
+        suggestions.push(correction);
+      }
+    }
+
+    // Common address format corrections
+    let correctedAddress = originalAddress;
+    
+    // Fix common abbreviations
+    correctedAddress = correctedAddress
+      .replace(/\bst\b/gi, 'Street')
+      .replace(/\bave\b/gi, 'Avenue')
+      .replace(/\bblvd\b/gi, 'Boulevard')
+      .replace(/\bdr\b/gi, 'Drive')
+      .replace(/\brd\b/gi, 'Road');
+
+    if (correctedAddress !== originalAddress) {
+      suggestions.push(correctedAddress);
+    }
+
+    // Add "Los Angeles, CA" if missing
+    if (!address.includes('los angeles') && !address.includes('ca') && !address.includes('california')) {
+      suggestions.push(`${originalAddress}, Los Angeles, CA`);
+      if (correctedAddress !== originalAddress) {
+        suggestions.push(`${correctedAddress}, Los Angeles, CA`);
+      }
+    }
+
+    // Common LA area suggestions if address seems incomplete
+    if (address.length < 10 || (!address.includes('los angeles') && !address.includes('ca'))) {
+      const commonLALocations = [
+        `${originalAddress}, Downtown Los Angeles, CA`,
+        `${originalAddress}, Hollywood, CA`,
+        `${originalAddress} Street, Los Angeles, CA`,
+        `${originalAddress} Avenue, Los Angeles, CA`
+      ];
+      suggestions.push(...commonLALocations.slice(0, 2));
+    }
+
+    // Remove duplicates and original address
+    return [...new Set(suggestions)].filter(s => 
+      s.toLowerCase() !== originalAddress.toLowerCase()
+    ).slice(0, 4);
+  };
+
+  // Enhanced geocoding function with backend API integration
+  const geocodeAddress = async (address: string): Promise<{
+    success: boolean;
+    destination?: Destination;
+    message?: string;
+  }> => {
     try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
-      );
+      // First, try to find if this is a place_id from our suggestions
+      const selectedSuggestion = addressSuggestions.find(s => s.description === address);
+      
+      let response;
+      if (selectedSuggestion && selectedSuggestion.place_id) {
+        // Use backend geocoding with place_id for more accurate results
+        response = await fetch(
+          `https://immobili-backend-production.up.railway.app/api/geocode-place?placeId=${encodeURIComponent(selectedSuggestion.place_id)}`
+        );
+      } else {
+        // Use backend geocoding with address
+        response = await fetch(
+          `https://immobili-backend-production.up.railway.app/api/geocode-place?address=${encodeURIComponent(address)}`
+        );
+      }
+      
+      if (!response.ok) {
+        throw new Error('Backend geocoding API failed');
+      }
       
       const data = await response.json();
       
-      if (data.status === 'OK' && data.results.length > 0) {
+      if (data.status === 'OK' && data.results && data.results.length > 0) {
         const result = data.results[0];
         const location = result.geometry.location;
         
         return {
-          latitude: location.lat,
-          longitude: location.lng,
-          name: result.formatted_address
+          success: true,
+          destination: {
+            latitude: location.lat,
+            longitude: location.lng,
+            name: result.formatted_address
+          }
         };
       } else {
-        console.error('Geocoding failed:', data.status);
-        return null;
+        console.error('Backend geocoding failed:', data.status);
+        
+        // Provide specific error messages and suggestions based on the error type
+        let errorMessage = '';
+        
+        switch (data.status) {
+          case 'ZERO_RESULTS':
+            const suggestions = generateAddressCorrections(address);
+            let suggestionText = '';
+            
+            if (suggestions.length > 0) {
+              suggestionText = '\n\n🤖 AI Suggestions:\n' + 
+                suggestions.map((suggestion, index) => `${index + 1}. ${suggestion}`).join('\n');
+            }
+            
+            errorMessage = `No results found for "${address}".${suggestionText}\n\n💡 General Tips:\n• Add more details (street number, city, state)\n• Use a nearby landmark or business name\n• Check for typos in the address\n• Try "Downtown Los Angeles" for general areas`;
+            break;
+          case 'OVER_QUERY_LIMIT':
+            errorMessage = 'Too many requests. Please wait a moment and try again.';
+            break;
+          case 'REQUEST_DENIED':
+            errorMessage = 'Location service unavailable. Please try again later.';
+            break;
+          case 'INVALID_REQUEST':
+            errorMessage = `Invalid location format.\n\nTry:\n• A complete address (e.g., "123 Main St, Los Angeles, CA")\n• A landmark or business name\n• A neighborhood or area name`;
+            break;
+          default:
+            errorMessage = `Location not found.\n\nSuggestions:\n• Try a more specific address\n• Include city and state\n• Use a nearby landmark\n• Check spelling`;
+        }
+        
+        return {
+          success: false,
+          message: errorMessage
+        };
       }
     } catch (error) {
-      console.error('Geocoding error:', error);
-      return null;
+      console.error('Backend geocoding error:', error);
+      
+      // Fallback to direct Google API if backend fails
+      try {
+        const fallbackResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_APIKEY}`
+        );
+        
+        const fallbackData = await fallbackResponse.json();
+        
+        if (fallbackData.status === 'OK' && fallbackData.results.length > 0) {
+          const result = fallbackData.results[0];
+          const location = result.geometry.location;
+          
+          return {
+            success: true,
+            destination: {
+              latitude: location.lat,
+              longitude: location.lng,
+              name: result.formatted_address
+            }
+          };
+        }
+      } catch (fallbackError) {
+        console.error('Fallback geocoding also failed:', fallbackError);
+      }
+      
+      return {
+        success: false,
+        message: 'Network error. Please check your connection and try again.'
+      };
     }
   };
 
@@ -1318,23 +1657,47 @@ const getSafetyColor = (safetyLevel: string) => {
             
             {/* Route Planning Controls */}
             <View style={styles.routeInputContainer}>
-              <TextInput
-                style={styles.routeInput}
-                placeholder="Enter destination..."
-                placeholderTextColor="#8E8E93"
-                value={destinationInput}
-                onChangeText={setDestinationInput}
-                onFocus={() => {
-                  // Optional: Add any additional focus behavior here
-                  console.log('Input focused');
-                }}
-                onBlur={() => {
-                  // Optional: Add any additional blur behavior here
-                  console.log('Input blurred');
-                }}
-                returnKeyType="search"
-                onSubmitEditing={handleSetDestination}
-              />
+              <View style={styles.inputWithClearContainer}>
+                <TextInput
+                  style={styles.routeInput}
+                  placeholder="Try: USC, 123 Main St LA, or Downtown Los Angeles"
+                  placeholderTextColor="#8E8E93"
+                  value={destinationInput}
+                  onChangeText={handleInputChange}
+                  onFocus={() => {
+                    console.log('Input focused');
+                    if (destinationInput.length >= 3) {
+                      setShowSuggestions(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    console.log('Input blurred');
+                    // Delay hiding suggestions to allow for suggestion selection
+                    setTimeout(() => {
+                      setShowSuggestions(false);
+                    }, 200);
+                  }}
+                  returnKeyType="search"
+                  onSubmitEditing={handleSetDestination}
+                  autoCapitalize="words"
+                  autoCorrect={true}
+                />
+                {destinationInput.length > 0 && (
+                  <TouchableOpacity 
+                    style={styles.clearInputButton} 
+                    onPress={() => {
+                      setDestinationInput('');
+                      setShowSuggestions(false);
+                      setAddressSuggestions([]);
+                      if (showDirections) {
+                        clearRoute();
+                      }
+                    }}
+                  >
+                    <Ionicons name="close" size={20} color="#8E8E93" />
+                  </TouchableOpacity>
+                )}
+              </View>
               <TouchableOpacity 
                 style={styles.routeButton} 
                 onPress={handleSetDestination}
@@ -1345,13 +1708,47 @@ const getSafetyColor = (safetyLevel: string) => {
                 </Text>
               </TouchableOpacity>
             </View>
-            
-            {showDirections && (
-              <TouchableOpacity style={styles.clearButton} onPress={clearRoute}>
-                <Text style={styles.clearButtonText}>Clear Route</Text>
-              </TouchableOpacity>
-            )}
 
+            {/* Address Suggestions Dropdown - Limited to top 3 */}
+            {showSuggestions && addressSuggestions.length > 0 && (
+              <View style={styles.suggestionsContainer}>
+                {isLoadingSuggestions && (
+                  <View style={styles.loadingSuggestion}>
+                    <Text style={styles.loadingText}>Loading suggestions...</Text>
+                  </View>
+                )}
+                {addressSuggestions.slice(0, 3).map((suggestion, index) => (
+                  <TouchableOpacity
+                    key={suggestion.place_id || index}
+                    style={styles.suggestionItem}
+                    onPress={() => handleSuggestionSelect(suggestion)}
+                  >
+                    <View style={styles.suggestionContent}>
+                      <Ionicons 
+                        name={suggestion.isAISuggestion ? "bulb-outline" : "location-outline"} 
+                        size={16} 
+                        color={suggestion.isAISuggestion ? "#4CAF50" : "#666"} 
+                        style={styles.suggestionIcon} 
+                      />
+                      <View style={styles.suggestionTextContainer}>
+                        <View style={styles.suggestionMainRow}>
+                          <Text style={styles.suggestionMainText}>
+                            {suggestion.structured_formatting?.main_text || suggestion.description}
+                          </Text>
+                          {suggestion.isAISuggestion && (
+                            <Text style={styles.aiSuggestionBadge}>AI</Text>
+                          )}
+                        </View>
+                        <Text style={styles.suggestionSecondaryText}>
+                          {suggestion.structured_formatting?.secondary_text || ''}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            
             {/* Route Analysis Results */}
             {showRouteAnalysis && routeAnalysis && (
               <Animated.View 
@@ -2001,14 +2398,25 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 0,
   },
-  routeInput: {
+  inputWithClearContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#2C2C2E',
-    color: 'white',
-    padding: 12,
     borderRadius: 8,
     marginRight: 12,
+  },
+  routeInput: {
+    flex: 1,
+    color: 'white',
+    padding: 12,
     fontSize: 16,
+    backgroundColor: 'transparent',
+  },
+  clearInputButton: {
+    padding: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   routeButton: {
     backgroundColor: '#007AFF',
@@ -2355,6 +2763,63 @@ const styles = StyleSheet.create({
   calloutDistance: {
     color: '#8E8E93',
     fontSize: 11,
+  },
+  
+  // Address suggestions styles
+  suggestionsContainer: {
+    backgroundColor: '#2C2C2E',
+    borderRadius: 8,
+    marginTop: 8,
+    marginBottom: 16,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  loadingSuggestion: {
+    padding: 12,
+    alignItems: 'center',
+  },
+  suggestionItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  suggestionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  suggestionIcon: {
+    marginRight: 12,
+  },
+  suggestionTextContainer: {
+    flex: 1,
+  },
+  suggestionMainRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  suggestionMainText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+    flex: 1,
+  },
+  aiSuggestionBadge: {
+    backgroundColor: '#4CAF50',
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  suggestionSecondaryText: {
+    color: '#8E8E93',
+    fontSize: 14,
   },
 });
 

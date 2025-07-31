@@ -47,6 +47,10 @@
     </dict>
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>Allow Immobili to use your location</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Allow Immobili to access your camera to take photos for community posts</string>
+    <key>NSPhotoLibraryUsageDescription</key>
+    <string>Allow Immobili to access your photo library to select photos for community posts</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

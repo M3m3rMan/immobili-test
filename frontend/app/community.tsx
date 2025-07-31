@@ -91,8 +91,18 @@ export default function Community() {
   useFocusEffect(
     React.useCallback(() => {
       console.log('Community screen focused - refreshing data');
-      loadUserData();
-      fetchPosts();
+      
+      // Add error handling for focus effect
+      const refreshData = async () => {
+        try {
+          await Promise.all([loadUserData(), fetchPosts()]);
+        } catch (error) {
+          console.error('Error during focus refresh:', error);
+          // Don't crash the app, just log the error
+        }
+      };
+      
+      refreshData();
     }, [])
   );
 
@@ -112,11 +122,16 @@ export default function Community() {
       const storedUserId = await AsyncStorage.getItem('userId');
       const storedUsername = await AsyncStorage.getItem('username');
       console.log('Loaded user data from AsyncStorage:', { storedUserId, storedUsername });
-      setUserId(storedUserId);
-      setUsername(storedUsername);
+      
+      // Ensure we have valid data before setting state
+      setUserId(storedUserId || null);
+      setUsername(storedUsername || null);
       console.log('Set username state to:', storedUsername);
     } catch (error) {
       console.error('Error loading user data:', error);
+      // Set default values on error
+      setUserId(null);
+      setUsername(null);
     } finally {
       setUserDataLoading(false);
     }
@@ -139,39 +154,66 @@ export default function Community() {
       setPostsLoading(true);
       console.log('🔄 Fetching posts from backend...');
       
-      const response = await fetch('https://immobili-backend-production.up.railway.app/api/community-posts');
-      if (response.ok) {
-        const data = await response.json();
-        console.log('📥 Fetched posts data:', data);
-        
-        // The backend returns { posts: [...] }, so we need to access data.posts
-        const fetchedPosts = data.posts || [];
-        console.log('📝 Raw fetched posts:', fetchedPosts);
-        
-        // Process the posts to handle populated user data
-        const processedPosts = fetchedPosts.map((post: any) => {
-          const processedPost = {
-            ...post,
-            // If userId is populated, use the username from the populated user object
-            username: post.userId?.username || post.username || 'Anonymous',
-            // Don't format timestamp here - let the component handle it
-            timestamp: post.timestamp || new Date().toISOString()
-          };
-          console.log('🔄 Processed post:', processedPost);
-          return processedPost;
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      try {
+        const response = await fetch('https://immobili-backend-production.up.railway.app/api/community-posts', {
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         
-        console.log('✅ All processed posts:', processedPosts);
-        
-        // Combine fetched posts with sample posts, ensuring we always have content
-        // Put fetched posts first so they appear at the top
-        const allPosts = [...processedPosts, ...SAMPLE_POSTS];
-        console.log('📋 Final posts array:', allPosts);
-        setPosts(allPosts);
-      } else {
-        console.error('❌ Failed to fetch posts:', response.status);
-        setPosts(SAMPLE_POSTS); // Use sample posts on error
-      }
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📥 Fetched posts data:', data);
+          
+          // The backend returns { posts: [...] }, so we need to access data.posts
+          const fetchedPosts = Array.isArray(data.posts) ? data.posts : [];
+          console.log('📝 Raw fetched posts:', fetchedPosts);
+          
+          // Process the posts to handle populated user data
+          const processedPosts = fetchedPosts.map((post: any) => {
+            try {
+              const processedPost = {
+                ...post,
+                // If userId is populated, use the username from the populated user object
+                username: post.userId?.username || post.username || 'Anonymous',
+                // Don't format timestamp here - let the component handle it
+                timestamp: post.timestamp || new Date().toISOString()
+              };
+              console.log('🔄 Processed post:', processedPost);
+              return processedPost;
+            } catch (postError) {
+              console.error('Error processing post:', postError);
+              return {
+                ...post,
+                username: 'Anonymous',
+                timestamp: new Date().toISOString()
+              };
+            }
+          });
+          
+          console.log('✅ All processed posts:', processedPosts);
+          
+          // Combine fetched posts with sample posts, ensuring we always have content
+          // Put fetched posts first so they appear at the top
+          const allPosts = [...processedPosts, ...SAMPLE_POSTS];
+          console.log('📋 Final posts array:', allPosts);
+          setPosts(allPosts);
+        } else {
+          console.error('❌ Failed to fetch posts:', response.status);
+          setPosts(SAMPLE_POSTS); // Use sample posts on error
+        }
+      } catch (fetchError: any) {
+         clearTimeout(timeoutId);
+         if (fetchError.name === 'AbortError') {
+           console.error('❌ Request timed out');
+         } else {
+           console.error('❌ Network error:', fetchError);
+         }
+         setPosts(SAMPLE_POSTS); // Use sample posts on error
+       }
     } catch (error) {
       console.error('❌ Error fetching posts:', error);
       setPosts(SAMPLE_POSTS); // Use sample posts on error
@@ -509,68 +551,93 @@ export default function Community() {
           </View>
         ) : (
           posts.map((post, index) => {
-            console.log('Rendering post:', { index, post });
-            const postUserId = typeof post.userId === 'object' ? post.userId._id : post.userId;
-            console.log('User ID comparison:', { postUserId, currentUserId: userId, shouldShowDelete: postUserId === userId });
-            return (
-            <View key={post._id || index} style={styles.postContainer}>
-              <View style={styles.postHeader}>
-                <View style={styles.userInfo}>
-                  {post.avatar && post.avatar !== '👤' ? (
-                    <Image source={{ uri: post.avatar }} style={styles.avatarImage} />
-                  ) : (
-                    <Text style={styles.avatar}>{post.avatar || '🛴'}</Text>
+            try {
+              console.log('Rendering post:', { index, post });
+              
+              // Ensure post has required properties
+              if (!post || typeof post !== 'object') {
+                console.warn('Invalid post object:', post);
+                return null;
+              }
+              
+              const postUserId = typeof post.userId === 'object' ? post.userId._id : post.userId;
+              console.log('User ID comparison:', { postUserId, currentUserId: userId, shouldShowDelete: postUserId === userId });
+              
+              return (
+                <View key={post._id || `post-${index}`} style={styles.postContainer}>
+                  <View style={styles.postHeader}>
+                    <View style={styles.userInfo}>
+                      {post.avatar && post.avatar !== '👤' ? (
+                        <Image 
+                          source={{ uri: post.avatar }} 
+                          style={styles.avatarImage}
+                          onError={() => console.warn('Failed to load avatar image:', post.avatar)}
+                        />
+                      ) : (
+                        <Text style={styles.avatar}>{post.avatar || '🛴'}</Text>
+                      )}
+                      <View>
+                        <Text style={styles.username}>{post.username || 'Anonymous'}</Text>
+                        <Text style={styles.timestamp}>{formatTimeAgo(post.timestamp)}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.postHeaderRight}>
+                      {post.location && (
+                        <View style={styles.locationContainer}>
+                          <Ionicons name="location-outline" size={12} color="#9CA3AF" />
+                          <Text style={styles.location}>{post.location}</Text>
+                        </View>
+                      )}
+                      {((typeof post.userId === 'object' ? post.userId._id : post.userId) === userId) && (
+                        <TouchableOpacity 
+                          style={styles.deleteButton}
+                          onPress={() => deletePost(post._id)}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+                  
+                  <Text style={styles.postText}>{post.text || ''}</Text>
+                  
+                  {post.image && (
+                    <Image 
+                      source={{ uri: post.image }} 
+                      style={styles.postImage}
+                      onError={() => console.warn('Failed to load post image:', post.image)}
+                    />
                   )}
-                  <View>
-                    <Text style={styles.username}>{post.username || 'Anonymous'}</Text>
-                    <Text style={styles.timestamp}>{formatTimeAgo(post.timestamp)}</Text>
+                  
+                  <View style={styles.postActions}>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => likePost(post._id)}
+                    >
+                      <Ionicons name="heart-outline" size={20} color={tintColor} />
+                      <Text style={[styles.actionText, { color: tintColor }]}>{post.likes || 0}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="chatbubble-outline" size={20} color={tintColor} />
+                      <Text style={[styles.actionText, { color: tintColor }]}>{post.comments || 0}</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="share-outline" size={20} color={tintColor} />
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <View style={styles.postHeaderRight}>
-                  {post.location && (
-                    <View style={styles.locationContainer}>
-                      <Ionicons name="location-outline" size={12} color="#9CA3AF" />
-                      <Text style={styles.location}>{post.location}</Text>
-                    </View>
-                  )}
-                  {((typeof post.userId === 'object' ? post.userId._id : post.userId) === userId) && (
-                    <TouchableOpacity 
-                      style={styles.deleteButton}
-                      onPress={() => deletePost(post._id)}
-                    >
-                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                    </TouchableOpacity>
-                  )}
+              );
+            } catch (renderError) {
+              console.error('Error rendering post:', renderError, 'Post:', post);
+              return (
+                <View key={`error-${index}`} style={styles.postContainer}>
+                  <Text style={styles.errorText}>Error loading post</Text>
                 </View>
-              </View>
-              
-              <Text style={styles.postText}>{post.text || ''}</Text>
-              
-              {post.image && (
-                <Image source={{ uri: post.image }} style={styles.postImage} />
-              )}
-              
-              <View style={styles.postActions}>
-                <TouchableOpacity 
-                  style={styles.actionButton}
-                  onPress={() => likePost(post._id)}
-                >
-                  <Ionicons name="heart-outline" size={20} color={tintColor} />
-                  <Text style={[styles.actionText, { color: tintColor }]}>{post.likes || 0}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.actionButton}>
-                  <Ionicons name="chatbubble-outline" size={20} color={tintColor} />
-                  <Text style={[styles.actionText, { color: tintColor }]}>{post.comments || 0}</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.actionButton}>
-                  <Ionicons name="share-outline" size={20} color={tintColor} />
-                </TouchableOpacity>
-              </View>
-            </View>
-            );
-          })
+              );
+            }
+          }).filter(Boolean) // Remove null entries
         )}
       </ScrollView>
 
@@ -784,6 +851,12 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize: 14,
     color: '#FFFFFF', // Updated action text color
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#EF4444',
+    textAlign: 'center',
+    padding: 16,
   },
   modalContainer: {
     flex: 1,
