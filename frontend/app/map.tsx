@@ -919,7 +919,7 @@ const MapScreen: React.FC = () => {
     setIsLoadingSuggestions(true);
     
     try {
-      // Use backend API for enhanced suggestions with USC-specific and AI-powered corrections
+      // Use backend API for Places API suggestions
       const response = await fetch(
         `https://immobili-backend-production.up.railway.app/api/places-autocomplete?input=${encodeURIComponent(input)}&sessiontoken=${Date.now()}`
       );
@@ -931,48 +931,19 @@ const MapScreen: React.FC = () => {
       const data = await response.json();
       let suggestions: any[] = [];
       
-      if (data.status === 'OK' || data.status === 'AI_FALLBACK') {
-        suggestions = (data.predictions || []).slice(0, 5);
-        
-        // Mark suggestions appropriately
-        suggestions = suggestions.map(suggestion => ({
-          ...suggestion,
-          isAISuggestion: suggestion.isAISuggestion || suggestion.isUSCSuggestion || false
-        }));
+      if (data.status === 'OK' && data.predictions) {
+        suggestions = data.predictions.slice(0, 5);
       } else {
         console.warn('Backend Places API returned:', data.status);
-        // Fallback to client-side AI suggestions
-        const aiCorrections = generateAddressCorrections(input);
-        suggestions = aiCorrections.map((correction, index) => ({
-          place_id: `ai_fallback_${index}`,
-          description: correction,
-          structured_formatting: {
-            main_text: correction.split(',')[0],
-            secondary_text: correction.split(',').slice(1).join(',').trim()
-          },
-          isAISuggestion: true
-        }));
+        suggestions = [];
       }
       
       setAddressSuggestions(suggestions);
       setShowSuggestions(suggestions.length > 0);
     } catch (error) {
       console.error('Error fetching suggestions from backend:', error);
-      
-      // Fallback to client-side AI suggestions on network error
-      const aiCorrections = generateAddressCorrections(input);
-      const fallbackSuggestions = aiCorrections.map((correction, index) => ({
-        place_id: `ai_fallback_${index}`,
-        description: correction,
-        structured_formatting: {
-          main_text: correction.split(',')[0],
-          secondary_text: correction.split(',').slice(1).join(',').trim()
-        },
-        isAISuggestion: true
-      }));
-      
-      setAddressSuggestions(fallbackSuggestions);
-      setShowSuggestions(fallbackSuggestions.length > 0);
+      setAddressSuggestions([]);
+      setShowSuggestions(false);
     } finally {
       setIsLoadingSuggestions(false);
     }
@@ -1004,8 +975,9 @@ const debouncedFetchSuggestions = useRef<ReturnType<typeof setTimeout> | undefin
     setAddressSuggestions([]);
     
     // If this is a Places API suggestion with place_id, use it for more accurate geocoding
-    if (suggestion.place_id && !suggestion.isAISuggestion) {
+    if (suggestion.place_id) {
       try {
+        setIsAnalyzing(true);
         const response = await fetch(
           `https://immobili-backend-production.up.railway.app/api/geocode-place?placeId=${encodeURIComponent(suggestion.place_id)}`
         );
@@ -1019,15 +991,27 @@ const debouncedFetchSuggestions = useRef<ReturnType<typeof setTimeout> | undefin
             // Update the input with the formatted address from Places API
             setDestinationInput(result.formatted_address);
             
-            // Automatically trigger destination setting with the exact coordinates
-            setTimeout(() => {
-              handleSetDestination();
-            }, 100);
+            // Directly set the destination with exact coordinates
+            const destination = {
+              latitude: location.lat,
+              longitude: location.lng,
+              name: result.formatted_address
+            };
+            
+            console.log(`Setting destination from Places API: ${destination.name} at (${destination.latitude}, ${destination.longitude})`);
+            
+            setDestination(destination);
+            setShowDirections(true);
+            
+            // Analyze the route with exact coordinates
+            await analyzeRoute(destination);
             return;
           }
         }
       } catch (error) {
         console.error('Error getting place details:', error);
+      } finally {
+        setIsAnalyzing(false);
       }
     }
     
@@ -1079,6 +1063,10 @@ const debouncedFetchSuggestions = useRef<ReturnType<typeof setTimeout> | undefin
       return;
     }
 
+    // Hide suggestions when GO button is pressed
+    setShowSuggestions(false);
+    setAddressSuggestions([]);
+
     // Validate input and show suggestion if needed
     const validation = validateLocationInput(destinationInput);
     if (!validation.isValid) {
@@ -1118,74 +1106,6 @@ const debouncedFetchSuggestions = useRef<ReturnType<typeof setTimeout> | undefin
       Alert.alert('Error', 'Failed to set destination. Please try again.');
       setIsAnalyzing(false);
     }
-  };
-
-  // AI-powered address correction suggestions
-  const generateAddressCorrections = (originalAddress: string): string[] => {
-    const suggestions: string[] = [];
-    const address = originalAddress.toLowerCase().trim();
-    
-    // Common USC campus locations and corrections
-    const uscCorrections: { [key: string]: string } = {
-      'usc': 'University of Southern California, Los Angeles, CA',
-      'university of southern california': 'University of Southern California, Los Angeles, CA',
-      'tommy trojan': 'Tommy Trojan Statue, USC Campus, Los Angeles, CA',
-      'doheny library': 'Doheny Memorial Library, USC, Los Angeles, CA',
-      'village': 'USC Village, Los Angeles, CA',
-      'parkside': 'Parkside Apartments, USC, Los Angeles, CA',
-      'lyon center': 'Lyon Recreation Center, USC, Los Angeles, CA',
-      'student union': 'Ronald Tutor Campus Center, USC, Los Angeles, CA',
-      'tutor center': 'Ronald Tutor Campus Center, USC, Los Angeles, CA',
-      'exposition': 'Exposition Boulevard, Los Angeles, CA',
-      'figueroa': 'Figueroa Street, Los Angeles, CA',
-      'vermont': 'Vermont Avenue, Los Angeles, CA'
-    };
-
-    // Check for USC-specific corrections
-    for (const [key, correction] of Object.entries(uscCorrections)) {
-      if (address.includes(key)) {
-        suggestions.push(correction);
-      }
-    }
-
-    // Common address format corrections
-    let correctedAddress = originalAddress;
-    
-    // Fix common abbreviations
-    correctedAddress = correctedAddress
-      .replace(/\bst\b/gi, 'Street')
-      .replace(/\bave\b/gi, 'Avenue')
-      .replace(/\bblvd\b/gi, 'Boulevard')
-      .replace(/\bdr\b/gi, 'Drive')
-      .replace(/\brd\b/gi, 'Road');
-
-    if (correctedAddress !== originalAddress) {
-      suggestions.push(correctedAddress);
-    }
-
-    // Add "Los Angeles, CA" if missing
-    if (!address.includes('los angeles') && !address.includes('ca') && !address.includes('california')) {
-      suggestions.push(`${originalAddress}, Los Angeles, CA`);
-      if (correctedAddress !== originalAddress) {
-        suggestions.push(`${correctedAddress}, Los Angeles, CA`);
-      }
-    }
-
-    // Common LA area suggestions if address seems incomplete
-    if (address.length < 10 || (!address.includes('los angeles') && !address.includes('ca'))) {
-      const commonLALocations = [
-        `${originalAddress}, Downtown Los Angeles, CA`,
-        `${originalAddress}, Hollywood, CA`,
-        `${originalAddress} Street, Los Angeles, CA`,
-        `${originalAddress} Avenue, Los Angeles, CA`
-      ];
-      suggestions.push(...commonLALocations.slice(0, 2));
-    }
-
-    // Remove duplicates and original address
-    return [...new Set(suggestions)].filter(s => 
-      s.toLowerCase() !== originalAddress.toLowerCase()
-    ).slice(0, 4);
   };
 
   // Enhanced geocoding function with backend API integration
@@ -1237,15 +1157,7 @@ const debouncedFetchSuggestions = useRef<ReturnType<typeof setTimeout> | undefin
         
         switch (data.status) {
           case 'ZERO_RESULTS':
-            const suggestions = generateAddressCorrections(address);
-            let suggestionText = '';
-            
-            if (suggestions.length > 0) {
-              suggestionText = '\n\n🤖 AI Suggestions:\n' + 
-                suggestions.map((suggestion, index) => `${index + 1}. ${suggestion}`).join('\n');
-            }
-            
-            errorMessage = `No results found for "${address}".${suggestionText}\n\n💡 General Tips:\n• Add more details (street number, city, state)\n• Use a nearby landmark or business name\n• Check for typos in the address\n• Try "Downtown Los Angeles" for general areas`;
+            errorMessage = `No results found for "${address}".\n\n💡 General Tips:\n• Add more details (street number, city, state)\n• Use a nearby landmark or business name\n• Check for typos in the address\n• Try "Downtown Los Angeles" for general areas`;
             break;
           case 'OVER_QUERY_LIMIT':
             errorMessage = 'Too many requests. Please wait a moment and try again.';
@@ -1725,9 +1637,9 @@ const getSafetyColor = (safetyLevel: string) => {
                   >
                     <View style={styles.suggestionContent}>
                       <Ionicons 
-                        name={suggestion.isAISuggestion ? "bulb-outline" : "location-outline"} 
+                        name="location-outline" 
                         size={16} 
-                        color={suggestion.isAISuggestion ? "#4CAF50" : "#666"} 
+                        color="#666" 
                         style={styles.suggestionIcon} 
                       />
                       <View style={styles.suggestionTextContainer}>
@@ -1735,9 +1647,6 @@ const getSafetyColor = (safetyLevel: string) => {
                           <Text style={styles.suggestionMainText}>
                             {suggestion.structured_formatting?.main_text || suggestion.description}
                           </Text>
-                          {suggestion.isAISuggestion && (
-                            <Text style={styles.aiSuggestionBadge}>AI</Text>
-                          )}
                         </View>
                         <Text style={styles.suggestionSecondaryText}>
                           {suggestion.structured_formatting?.secondary_text || ''}
@@ -2806,16 +2715,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     flex: 1,
-  },
-  aiSuggestionBadge: {
-    backgroundColor: '#4CAF50',
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '600',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    marginLeft: 8,
   },
   suggestionSecondaryText: {
     color: '#8E8E93',

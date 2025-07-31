@@ -927,25 +927,20 @@ app.get('/api/places-autocomplete', async (req, res) => {
         status: response.data.status
       });
     } else {
-      console.log('Google Places API failed, using AI fallback:', response.data.status);
-      // If Google Places fails, provide AI-generated suggestions
-      const aiSuggestions = generateAISuggestions(input);
+      console.log('Google Places API failed:', response.data.status);
       res.json({
-        predictions: aiSuggestions,
-        status: 'AI_FALLBACK',
-        googleStatus: response.data.status,
-        googleError: response.data.error_message
+        predictions: [],
+        status: response.data.status,
+        error_message: response.data.error_message
       });
     }
   } catch (error) {
     console.error('Error fetching places:', error.message);
     console.error('Error details:', error.response?.data);
     
-    // Fallback to AI suggestions on error
-    const aiSuggestions = generateAISuggestions(req.query.input);
-    res.json({
-      predictions: aiSuggestions,
-      status: 'AI_FALLBACK',
+    res.status(500).json({
+      predictions: [],
+      status: 'ERROR',
       error: 'Google Places API unavailable',
       errorDetails: error.message
     });
@@ -1007,80 +1002,6 @@ function generateUSCSpecificSuggestions(input) {
     location.description.toLowerCase().includes(inputLower) ||
     location.structured_formatting.main_text.toLowerCase().includes(inputLower)
   );
-}
-
-// Helper function to generate AI-powered suggestions
-function generateAISuggestions(input) {
-  const inputLower = input.toLowerCase();
-  const suggestions = [];
-  
-  // Common address format corrections
-  const formatCorrections = {
-    'st': 'Street',
-    'ave': 'Avenue',
-    'blvd': 'Boulevard',
-    'rd': 'Road',
-    'dr': 'Drive',
-    'ln': 'Lane',
-    'ct': 'Court',
-    'pl': 'Place'
-  };
-  
-  // Check for abbreviations and suggest full forms
-  Object.keys(formatCorrections).forEach(abbrev => {
-    if (inputLower.includes(abbrev)) {
-      const corrected = input.replace(new RegExp(abbrev, 'gi'), formatCorrections[abbrev]);
-      suggestions.push({
-        description: `${corrected}, Los Angeles, CA, USA`,
-        place_id: `ai_correction_${Date.now()}_${Math.random()}`,
-        structured_formatting: {
-          main_text: corrected,
-          secondary_text: 'Los Angeles, CA, USA'
-        },
-        isAISuggestion: true
-      });
-    }
-  });
-  
-  // USC-specific suggestions for common terms
-  if (inputLower.includes('usc') || inputLower.includes('university')) {
-    suggestions.push({
-      description: 'University of Southern California, Los Angeles, CA, USA',
-      place_id: `ai_usc_${Date.now()}`,
-      structured_formatting: {
-        main_text: 'University of Southern California',
-        secondary_text: 'Los Angeles, CA, USA'
-      },
-      isAISuggestion: true
-    });
-  }
-  
-  // General LA area suggestions
-  const laAreas = [
-    'Downtown Los Angeles',
-    'Hollywood',
-    'Beverly Hills',
-    'Santa Monica',
-    'Venice Beach',
-    'Westwood',
-    'Koreatown'
-  ];
-  
-  laAreas.forEach(area => {
-    if (area.toLowerCase().includes(inputLower) && inputLower.length > 2) {
-      suggestions.push({
-        description: `${area}, Los Angeles, CA, USA`,
-        place_id: `ai_la_${Date.now()}_${Math.random()}`,
-        structured_formatting: {
-          main_text: area,
-          secondary_text: 'Los Angeles, CA, USA'
-        },
-        isAISuggestion: true
-      });
-    }
-  });
-  
-  return suggestions.slice(0, 3); // Limit to 3 AI suggestions
 }
 
 // Enhanced geocoding endpoint with Places API integration
